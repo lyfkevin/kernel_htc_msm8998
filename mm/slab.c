@@ -2121,8 +2121,6 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
 	if (!(flags & SLAB_DESTROY_BY_RCU))
 		flags |= SLAB_POISON;
 #endif
-	if (flags & SLAB_DESTROY_BY_RCU)
-		BUG_ON(flags & SLAB_POISON);
 #endif
 
 	/*
@@ -2379,9 +2377,6 @@ static int drain_freelist(struct kmem_cache *cache,
 		}
 
 		page = list_entry(p, struct page, lru);
-#if DEBUG
-		BUG_ON(page->active);
-#endif
 		list_del(&page->lru);
 		/*
 		 * Safe to drop the lock. The slab is no longer linked
@@ -2539,29 +2534,22 @@ static void kmem_flagcheck(struct kmem_cache *cachep, gfp_t flags)
 	}
 }
 
-static void *slab_get_obj(struct kmem_cache *cachep, struct page *page,
-				int nodeid)
+static void *slab_get_obj(struct kmem_cache *cachep, struct page *page)
 {
 	void *objp;
 
 	objp = index_to_obj(cachep, page, get_free_obj(page, page->active));
 	page->active++;
-#if DEBUG
-	WARN_ON(page_to_nid(virt_to_page(objp)) != nodeid);
-#endif
 
 	return objp;
 }
 
-static void slab_put_obj(struct kmem_cache *cachep, struct page *page,
-				void *objp, int nodeid)
+static void slab_put_obj(struct kmem_cache *cachep,
+			struct page *page, void *objp)
 {
 	unsigned int objnr = obj_to_index(cachep, page, objp);
 #if DEBUG
 	unsigned int i;
-
-	/* Verify that the slab belongs to the intended node */
-	WARN_ON(page_to_nid(virt_to_page(objp)) != nodeid);
 
 	/* Verify double free bug */
 	for (i = page->active; i < cachep->num; i++) {
@@ -2819,8 +2807,7 @@ retry:
 			STATS_INC_ACTIVE(cachep);
 			STATS_SET_HIGH(cachep);
 
-			ac_put_obj(cachep, ac, slab_get_obj(cachep, page,
-									node));
+			ac_put_obj(cachep, ac, slab_get_obj(cachep, page));
 		}
 
 		/* move slabp to correct slabp list: */
@@ -3117,7 +3104,7 @@ retry:
 
 	BUG_ON(page->active == cachep->num);
 
-	obj = slab_get_obj(cachep, page, nodeid);
+	obj = slab_get_obj(cachep, page);
 	n->free_objects--;
 	/* move slabp to correct slabp list: */
 	list_del(&page->lru);
@@ -3286,7 +3273,7 @@ static void free_block(struct kmem_cache *cachep, void **objpp,
 		page = virt_to_head_page(objp);
 		list_del(&page->lru);
 		check_spinlock_acquired_node(cachep, node);
-		slab_put_obj(cachep, page, objp, node);
+		slab_put_obj(cachep, page, objp);
 		STATS_DEC_ACTIVE(cachep);
 		n->free_objects++;
 
@@ -3316,9 +3303,7 @@ static void cache_flusharray(struct kmem_cache *cachep, struct array_cache *ac)
 	LIST_HEAD(list);
 
 	batchcount = ac->batchcount;
-#if DEBUG
-	BUG_ON(!batchcount || batchcount > ac->avail);
-#endif
+
 	check_irq_off();
 	n = get_node(cachep, node);
 	spin_lock(&n->list_lock);
