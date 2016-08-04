@@ -52,9 +52,7 @@ MODULE_AUTHOR("Zhang Rui");
 MODULE_DESCRIPTION("Generic thermal management sysfs support");
 MODULE_LICENSE("GPL v2");
 
-static char *truly_shutdown[2] = { "CPU_TEMP=SHUTDOWN_TEMP", NULL };
-static char *shutdown_waring[2]    = { "CPU_TEMP=CLOSE_TO_SHUTDOWN_TEMP", NULL };
-static char *clr_shutdown_warning[2]   = { "CPU_TEMP=CLOSE_TO_SHUTDOWN_TEMP_CLR", NULL };
+#define THERMAL_MAX_ACTIVE	16
 
 static DEFINE_IDR(thermal_tz_idr);
 static DEFINE_IDR(thermal_cdev_idr);
@@ -68,6 +66,8 @@ static DEFINE_MUTEX(thermal_list_lock);
 static DEFINE_MUTEX(thermal_governor_lock);
 
 static struct thermal_governor *def_governor;
+
+static struct workqueue_struct *thermal_passive_wq;
 
 static struct thermal_governor *__find_governor(const char *name)
 {
@@ -798,14 +798,15 @@ exit:
 	mutex_unlock(&thermal_list_lock);
 }
 
-static void thermal_zone_device_set_polling(struct thermal_zone_device *tz,
+static void thermal_zone_device_set_polling(struct workqueue_struct *queue,
+					    struct thermal_zone_device *tz,
 					    int delay)
 {
 	if (delay > 1000)
-		mod_delayed_work(system_freezable_wq, &tz->poll_queue,
+		mod_delayed_work(queue, &tz->poll_queue,
 				 round_jiffies(msecs_to_jiffies(delay)));
 	else if (delay)
-		mod_delayed_work(system_freezable_wq, &tz->poll_queue,
+		mod_delayed_work(queue, &tz->poll_queue,
 				 msecs_to_jiffies(delay));
 	else
 		cancel_delayed_work(&tz->poll_queue);
@@ -816,11 +817,13 @@ static void monitor_thermal_zone(struct thermal_zone_device *tz)
 	mutex_lock(&tz->lock);
 
 	if (tz->passive)
-		thermal_zone_device_set_polling(tz, tz->passive_delay);
+		thermal_zone_device_set_polling(thermal_passive_wq,
+						tz, tz->passive_delay);
 	else if (tz->polling_delay)
-		thermal_zone_device_set_polling(tz, tz->polling_delay);
+		thermal_zone_device_set_polling(system_freezable_wq,
+						tz, tz->polling_delay);
 	else
-		thermal_zone_device_set_polling(tz, 0);
+		thermal_zone_device_set_polling(NULL, tz, 0);
 
 	mutex_unlock(&tz->lock);
 }
@@ -1017,28 +1020,6 @@ temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 		return ret;
 
 	return sprintf(buf, "%d\n", temperature);
-}
-
-static ssize_t
-temp_notify_store(struct device *dev, struct device_attribute *attr,
-	const char *buf, size_t count)
-{
-	struct thermal_zone_device *tz = to_thermal_zone(dev);
-	unsigned int status=0;
-	unsigned long  value=0;
-	if (kstrtoul(buf, 10, &value))
-		return -EINVAL;
-
-	if (value == 1) //num 1 2 3 here just standfor an indicator, not means temp
-		status = kobject_uevent_env(&tz->device.kobj, KOBJ_CHANGE, clr_shutdown_warning);
-	if (value == 2)
-		status = kobject_uevent_env(&tz->device.kobj, KOBJ_CHANGE, shutdown_waring);
-	if (value == 3)
-		status = kobject_uevent_env(&tz->device.kobj, KOBJ_CHANGE, truly_shutdown);
-
-	pr_info("cpu temp uevent :temp=%s,sucess=%d\n",buf,status);
-
-	return count;
 }
 
 static ssize_t
@@ -1583,7 +1564,6 @@ static DEVICE_ATTR(mode, 0644, mode_show, mode_store);
 static DEVICE_ATTR(passive, S_IRUGO | S_IWUSR, passive_show, passive_store);
 static DEVICE_ATTR(policy, S_IRUGO | S_IWUSR, policy_show, policy_store);
 static DEVICE_ATTR(available_policies, S_IRUGO, available_policies_show, NULL);
-static DEVICE_ATTR(temp_notify, S_IWUSR, NULL, temp_notify_store);
 
 /* sys I/F for cooling device */
 #define to_cooling_device(_dev)	\
@@ -2373,10 +2353,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 			goto unregister;
 	}
 
-	result = device_create_file(&tz->device, &dev_attr_temp_notify);
-	if (result)
-		goto unregister;
-
 	if (IS_ENABLED(CONFIG_THERMAL_EMULATION)) {
 		result = device_create_file(&tz->device, &dev_attr_emul_temp);
 		if (result)
@@ -2491,7 +2467,7 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 
 	mutex_unlock(&thermal_list_lock);
 
-	thermal_zone_device_set_polling(tz, 0);
+	thermal_zone_device_set_polling(NULL, tz, 0);
 
 	if (tz->type[0])
 		device_remove_file(&tz->device, &dev_attr_type);
@@ -2684,9 +2660,18 @@ static int __init thermal_init(void)
 {
 	int result;
 
+	thermal_passive_wq = alloc_workqueue("thermal_passive_wq",
+						WQ_HIGHPRI | WQ_UNBOUND
+						| WQ_FREEZABLE,
+						THERMAL_MAX_ACTIVE);
+	if (!thermal_passive_wq) {
+		result = -ENOMEM;
+		goto error;
+	}
+
 	result = thermal_register_governors();
 	if (result)
-		goto error;
+		goto destroy_wq;
 
 	result = class_register(&thermal_class);
 	if (result)
@@ -2708,6 +2693,8 @@ unregister_class:
 	class_unregister(&thermal_class);
 unregister_governors:
 	thermal_unregister_governors();
+destroy_wq:
+	destroy_workqueue(thermal_passive_wq);
 error:
 	idr_destroy(&thermal_tz_idr);
 	idr_destroy(&thermal_cdev_idr);
@@ -2720,6 +2707,7 @@ error:
 static void __exit thermal_exit(void)
 {
 	of_thermal_destroy_zones();
+	destroy_workqueue(thermal_passive_wq);
 	genetlink_exit();
 	class_unregister(&thermal_class);
 	thermal_unregister_governors();
