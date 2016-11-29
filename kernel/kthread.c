@@ -555,7 +555,6 @@ int kthread_stop(struct task_struct *k)
 	__kthread_unpark(k, kthread);
 	wake_up_process(k);
 	wait_for_completion(&kthread->exited);
-        put_task_stack(k);
 	ret = k->exit_code;
 	put_task_struct(k);
 
