@@ -647,8 +647,6 @@ void del_gendisk_no_sync(struct gendisk *disk, bool flag)
 	disk_part_iter_init(&piter, disk,
 			     DISK_PITER_INCL_EMPTY | DISK_PITER_REVERSE);
 	while ((part = disk_part_iter_next(&piter))) {
-		bdev_unhash_inode(MKDEV(disk->major,
-					disk->first_minor + part->partno));
 		if (flag == true) {
 			bdev = bdget_disk(disk, part->partno);
 			if (bdev) {
@@ -658,6 +656,7 @@ void del_gendisk_no_sync(struct gendisk *disk, bool flag)
 		} else {
 			invalidate_partition(disk, part->partno);
 		}
+		bdev_unhash_inode(part_devt(part));
 		delete_partition(disk, part->partno);
 	}
 	disk_part_iter_exit(&piter);
