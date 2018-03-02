@@ -5,6 +5,7 @@
 #include <linux/page_ext.h>
 #include <linux/poison.h>
 #include <linux/ratelimit.h>
+#include <htc_debug/stability/debug_page_user_trace.h>
 
 static bool want_page_poisoning __read_mostly
 		= IS_ENABLED(CONFIG_PAGE_POISONING_ENABLE_DEFAULT);
@@ -124,6 +125,8 @@ void kernel_poison_pages(struct page *page, int numpages, int enable)
 		unpoison_pages(page, numpages);
 	else
 		poison_pages(page, numpages);
+
+	set_page_user_trace(page, numpages, !enable);
 }
 
 #ifndef CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC

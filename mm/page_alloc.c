@@ -1338,6 +1338,7 @@ bool is_cma_pageblock(struct page *page)
 {
 	return get_pageblock_migratetype(page) == MIGRATE_CMA;
 }
+EXPORT_SYMBOL(is_cma_pageblock);
 
 /* Free whole pageblock and set its migration type to MIGRATE_CMA. */
 void __init init_cma_reserved_pageblock(struct page *page)
@@ -6280,6 +6281,22 @@ static void __meminit setup_per_zone_inactive_ratio(void)
 		calculate_zone_inactive_ratio(zone);
 }
 
+int vm_inactive_ratio = 0;
+int vm_inactive_ratio_handler(struct ctl_table *table, int write,
+	void __user *buffer, size_t *length, loff_t *ppos)
+{
+	struct zone *zone;
+	int old_ratio = vm_inactive_ratio;
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, buffer, length, ppos);
+	if (ret == 0 && write && vm_inactive_ratio != old_ratio) {
+		for_each_zone(zone){
+			zone->inactive_ratio = vm_inactive_ratio;
+		}
+	}
+	return ret;
+}
 /*
  * Initialise min_free_kbytes.
  *
