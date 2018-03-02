@@ -106,9 +106,15 @@ static const char *const compat_hwcap2_str[] = {
 };
 #endif /* CONFIG_COMPAT */
 
+#if defined(CONFIG_ARCH_SDM660) || defined(CONFIG_ARCH_SDM630)
+extern volatile u64 htc_target_quot[2][5];
+#elif defined(CONFIG_ARCH_MSM8998)
+extern volatile u64 htc_target_quot[2][4];
+#endif
+extern volatile int htc_target_quot_len;
 static int c_show(struct seq_file *m, void *v)
 {
-	int i, j;
+	int i, j, size;
 	bool compat = personality(current->personality) == PER_LINUX32;
 
 	seq_printf(m, "Processor\t: AArch64 Processor rev %d (%s)\n",
@@ -167,6 +173,14 @@ static int c_show(struct seq_file *m, void *v)
 		seq_printf(m, "Hardware\t: %s\n", machine_name);
 	else
 		seq_printf(m, "Hardware\t: %s\n", arch_read_hardware_id());
+
+	size = sizeof(htc_target_quot)/(sizeof(u64)*htc_target_quot_len);
+	seq_printf(m, "CPU param\t: ");
+	for (i = 0; i < size; i++) {
+		for(j = 0; j < htc_target_quot_len; j++)
+			seq_printf(m, "%lld ", htc_target_quot[i][j]);
+	}
+	seq_printf(m, "\n");
 
 	return 0;
 }
