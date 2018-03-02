@@ -28,6 +28,10 @@
 #include <asm/errno.h>
 #include <asm/smp_plat.h>
 
+#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
+#include <htc_mnemosyne/htc_footprint.h>
+#endif
+
 static int __init cpu_psci_cpu_init(unsigned int cpu)
 {
 	pr_info("Initializing psci_cpu_init\n");
@@ -49,6 +53,16 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
 	int err = psci_ops.cpu_on(cpu_logical_map(cpu), __pa(secondary_entry));
 	if (err)
 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
+
+#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
+	init_cpu_foot_print(cpu, false, true);
+	if (err)
+		set_cpu_foot_print(cpu, 0xfa);
+	else {
+		set_cpu_foot_print(cpu, 0xb);
+                inc_kernel_exit_counter_from_pc(cpu);
+	}
+#endif
 
 	return err;
 }
@@ -77,7 +91,17 @@ static void cpu_psci_cpu_die(unsigned int cpu)
 	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
 		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
 
+#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
+	init_cpu_foot_print(cpu, false, true);
+	set_cpu_foot_print(cpu, 0x1);
+#endif
+
 	ret = psci_ops.cpu_off(state);
+
+#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
+	init_cpu_foot_print(cpu, false, true);
+	set_cpu_foot_print(cpu, 0xfe);
+#endif
 
 	pr_crit("unable to power off CPU%u (%d)\n", cpu, ret);
 }
