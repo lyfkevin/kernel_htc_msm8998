@@ -38,6 +38,23 @@
 #define MAX_NR_GPIO 300
 #define PS_HOLD_OFFSET 0x820
 
+#define GPIO_GROUP1 0x100000
+#define GPIO_GROUP2 0x900000
+#define GPIO_GROUP3 0x500000
+#define REG_SIZE 0x1000
+#define MSM_PIN_START 0
+
+#ifdef CONFIG_ARCH_MSM8998
+#define MSM_PIN_END 150
+#define SDC_PIN_START 150
+#define SDC_PIN_END 153
+#endif
+#ifdef CONFIG_ARCH_SDM630
+#define MSM_PIN_END 114
+#define SDC_PIN_START 114
+#define SDC_PIN_END 121
+#endif
+
 /**
  * struct msm_pinctrl - state for a pinctrl-msm device
  * @dev:            device handle.
@@ -461,6 +478,198 @@ static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 	spin_unlock_irqrestore(&pctrl->lock, flags);
 }
 
+#ifdef CONFIG_HTC_POWER_DEBUG
+struct gpio_chip *g_chip;
+
+int msm_dump_sdc(struct seq_file *m, int curr_len, char *gpio_buffer)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(g_chip, struct msm_pinctrl, chip);
+	unsigned int i, len;
+	int drive, pull;
+	u32 ctl_reg;
+	char *title_msg = "------------ MSM SDC GPIO -------------";
+	char list_gpio[100];
+
+	if (m) {
+		seq_printf(m, "%s\n", title_msg);
+	} else {
+		pr_info("%s\n", title_msg);
+		curr_len += sprintf(gpio_buffer + curr_len, "%s\n", title_msg);
+	}
+	for (i = SDC_PIN_START ;i < SDC_PIN_END; i++) {
+		memset(list_gpio, 0 , sizeof(list_gpio));
+		len = 0;
+		g = &pctrl->soc->groups[i];
+		ctl_reg = readl(pctrl->regs + g->ctl_reg);
+		drive = (ctl_reg >> g->drv_bit) & 7;
+		pull = (ctl_reg >> g->pull_bit) & 3;
+
+		len += sprintf(list_gpio + len, "GPIO[%s]: ", g->name);
+
+		switch (pull) {
+		case 0x0:
+			len += sprintf(list_gpio + len, "[PULL]NO, ");
+			break;
+		case 0x1:
+			len += sprintf(list_gpio + len, "[PULL]PD, ");
+			break;
+		case 0x2:
+			len += sprintf(list_gpio + len, "[PULL]KP, ");
+			break;
+		case 0x3:
+                        len += sprintf(list_gpio + len, "[PULL]PU, ");
+			break;
+		default:
+			break;
+		}
+		len += sprintf(list_gpio + len, "[DRV]%2dmA, ", msm_regval_to_drive(drive));
+		list_gpio[99] = '\0';
+
+		if (m)
+			seq_printf(m, "%s\n", list_gpio);
+		else {
+			pr_info("%s\n", list_gpio);
+			curr_len += sprintf(gpio_buffer +
+			curr_len, "%s\n", list_gpio);
+		}
+	}
+	return curr_len;
+}
+
+/* msm_dump_gpios is reference to msm_gpio_dbg_show_one function */
+int msm_dump_gpios(struct seq_file *m, int curr_len, char *gpio_buffer)
+{
+	const struct msm_pingroup *g;
+	struct msm_pinctrl *pctrl = container_of(g_chip, struct msm_pinctrl, chip);
+	unsigned func;
+	//unsigned gpio_base = g_chip->base;
+	unsigned int i, len;
+	int is_out, drive, pull, io_value, intr_en, intr_target;
+	u32 ctl_reg, io_reg, intr_cfg_reg;
+	char *title_msg = "------------ MSM GPIO -------------";
+	char list_gpio[100];
+
+	if (m) {
+		seq_printf(m, "%s\n", title_msg);
+	} else {
+		pr_info("%s\n", title_msg);
+		curr_len += sprintf(gpio_buffer + curr_len, "%s\n", title_msg);
+	}
+	for (i = MSM_PIN_START ;i < MSM_PIN_END; i++) {
+		memset(list_gpio, 0 , sizeof(list_gpio));
+		len = 0;
+
+		g = &pctrl->soc->groups[i];
+#ifdef CONFIG_ARCH_MSM8998
+	if((i>=4 && i<=7)||(i>=38 && i<=39)||(i>=53 && i<=80)||(i>=97 && i<=104)||\
+		(i>=114 && i<=116)||(i>=127 && i<=129)||(i>=132 && i<=149)){
+		ctl_reg = readl(pctrl->regs + GPIO_GROUP1 + (REG_SIZE * i));
+	}else if((i>=8 && i<=34)||(i>=40 && i<=48)||(i>=85 && i<=96)||(i>=117 && i<=126)){
+		ctl_reg = readl(pctrl->regs + GPIO_GROUP2 + (REG_SIZE * i));
+	}else if((i>=35 && i<=37)||(i>=49 && i<=52)||(i>=105 && i<=113)||(i>=130 && i<=131)){
+		ctl_reg = readl(pctrl->regs + GPIO_GROUP3 + (REG_SIZE * i));
+	}else
+	continue;
+#endif
+#ifdef CONFIG_ARCH_SDM630
+	if((i>=0 && i<=3)||(i>=5 && i<=7)||(i>=20 && i<=21)||(i>=32 && i<=52)||(i>=55 && i<=58)||\
+		(i>=64 && i<=65)||(i>=79 && i<=80)||(i>=83 && i<=113)){
+		ctl_reg = readl(pctrl->regs + GPIO_GROUP1 + (REG_SIZE * i));
+	}else if((i==4)||(i>=8 && i<=11)||(i>=24 && i<=27)||(i>=53 && i<=54)||\
+		(i>=59 && i<=63)||(i>=66 && i<=78)){
+		ctl_reg = readl(pctrl->regs + GPIO_GROUP2 + (REG_SIZE * i));
+	}else if((i>=16 && i<=19)||(i>=22 && i<=23)||(i>=28 && i<=31)||(i>=81 && i<=82)){
+		ctl_reg = readl(pctrl->regs + GPIO_GROUP3 + (REG_SIZE * i));
+	}else
+	continue;
+#endif
+		io_reg = readl(pctrl->regs + g->io_reg);
+		intr_cfg_reg = readl(pctrl->regs + g->intr_cfg_reg);
+		is_out = !!(ctl_reg & BIT(g->oe_bit));
+		func = (ctl_reg >> g->mux_bit) & 7;
+		drive = (ctl_reg >> g->drv_bit) & 7;
+		pull = (ctl_reg >> g->pull_bit) & 3;
+		intr_en = intr_cfg_reg & 0x1;
+		intr_target = (ctl_reg >> g->intr_target_bit) & 3;
+
+        len += sprintf(list_gpio + len, "GPIO[%3d]: ", i);
+        len += sprintf(list_gpio + len, "[FS]0x%x, ", func);
+
+        if (is_out) {
+			io_value = (io_reg >> 1) & 0x1;
+            len += sprintf(list_gpio + len, "[DIR]OUT, [VAL]%s ", io_value ? "HIGH" : " LOW");
+        } else {
+			io_value = io_reg & 0x1;
+            len += sprintf(list_gpio + len, "[DIR] IN, [VAL]%s ", io_value ? "HIGH" : " LOW");
+        }
+
+        switch (pull) {
+	        case 0x0:
+	                len += sprintf(list_gpio + len, "[PULL]NO, ");
+	                break;
+	        case 0x1:
+	                len += sprintf(list_gpio + len, "[PULL]PD, ");
+	                break;
+	        case 0x2:
+	                len += sprintf(list_gpio + len, "[PULL]KP, ");
+	                break;
+	        case 0x3:
+	                len += sprintf(list_gpio + len, "[PULL]PU, ");
+	                break;
+	        default:
+	                break;
+        }
+
+        len += sprintf(list_gpio + len, "[DRV]%2dmA, ", msm_regval_to_drive(drive));
+
+        if (!is_out) {
+            len += sprintf(list_gpio + len, "[INT]%s, ", intr_en ? "YES" : " NO");
+            if (intr_en) {
+                switch (intr_target) {
+	                case 0x0:
+	                        len += sprintf(list_gpio + len, "SPS_PROC, ");
+	                        break;
+	                case 0x1:
+	                        len += sprintf(list_gpio + len, " LPA_DSP, ");
+	                        break;
+	                case 0x2:
+	                        len += sprintf(list_gpio + len, "RPM_PROC, ");
+	                        break;
+	                case 0x3:
+	                        len += sprintf(list_gpio + len, "MSS_PROC, ");
+	                        break;
+	                case 0x4:
+	                        len += sprintf(list_gpio + len, "GSS_PROC, ");
+	                        break;
+	                case 0x5:
+	                        len += sprintf(list_gpio + len, " TZ_PROC, ");
+	                        break;
+	                case 0x6:
+	                        len += sprintf(list_gpio + len, "RESERVED, ");
+	                        break;
+	                case 0x7:
+	                        len += sprintf(list_gpio + len, "    NONE, ");
+	                        break;
+	                default:
+	                        break;
+                }
+            }
+        }
+
+        list_gpio[99] = '\0';
+        if (m) {
+                seq_printf(m, "%s\n", list_gpio);
+        } else {
+                pr_info("%s\n", list_gpio);
+                curr_len += sprintf(gpio_buffer +
+                curr_len, "%s\n", list_gpio);
+        }
+    }
+    return curr_len;
+}
+#endif
+
 #ifdef CONFIG_DEBUG_FS
 #include <linux/seq_file.h>
 
@@ -860,6 +1069,9 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
 	gpiochip_set_chained_irqchip(chip, &msm_gpio_irq_chip, pctrl->irq,
 				     msm_gpio_irq_handler);
 	of_mpm_init();
+#ifdef CONFIG_HTC_POWER_DEBUG
+	g_chip = &pctrl->chip;
+#endif
 
 	return 0;
 }
