@@ -303,6 +303,7 @@ static void update_related_freq_table(struct cpufreq_policy *policy)
 	}
 }
 
+extern int pnpmgr_cpu_temp_notify(int cpu, int temp);
 static __ref int do_sampling(void *data)
 {
 	int cpu;
@@ -324,6 +325,9 @@ static __ref int do_sampling(void *data)
 			if (prev_temp[cpu] != cpu_node->temp) {
 				prev_temp[cpu] = cpu_node->temp;
 				set_threshold(cpu_node);
+#ifdef ONFIG_HTC_PNPMGR
+				pnpmgr_cpu_temp_notify(cpu, prev_temp[cpu]);
+#endif
 				trace_temp_threshold(cpu, cpu_node->temp,
 					cpu_node->hi_threshold.temp /
 					scaling_factor,
