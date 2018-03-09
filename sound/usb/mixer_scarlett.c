@@ -878,7 +878,13 @@ static int scarlett_controls_create_generic(struct usb_mixer_interface *mixer,
 				return err;
 			break;
 		case SCARLETT_SWITCH_IMPEDANCE:
+/* HTC_AUD_START */
+#if 0
 			sprintf(mx, "Input %d Impedance Switch", ctl->num);
+#else
+			snprintf(mx, sizeof(mx), "Input %d Impedance Switch", ctl->num);
+#endif
+/* HTC_AUD_END */
 			err = add_new_ctl(mixer, &usb_scarlett_ctl_enum,
 					  scarlett_ctl_enum_resume, 0x01,
 					  0x09, ctl->num, USB_MIXER_S16, 1, mx,
@@ -887,7 +893,13 @@ static int scarlett_controls_create_generic(struct usb_mixer_interface *mixer,
 				return err;
 			break;
 		case SCARLETT_SWITCH_PAD:
+/* HTC_AUD_START */
+#if 0
 			sprintf(mx, "Input %d Pad Switch", ctl->num);
+#else
+			snprintf(mx, sizeof(mx), "Input %d Pad Switch", ctl->num);
+#endif
+/* HTC_AUD_END */
 			err = add_new_ctl(mixer, &usb_scarlett_ctl_enum,
 					  scarlett_ctl_enum_resume, 0x01,
 					  0x0b, ctl->num, USB_MIXER_S16, 1, mx,
@@ -953,8 +965,15 @@ int snd_scarlett_controls_create(struct usb_mixer_interface *mixer)
 			return err;
 
 		for (o = 0; o < info->matrix_out; o++) {
+/* HTC_AUD_START */
+#if 0
 			sprintf(mx, "Matrix %02d Mix %c Playback Volume", i+1,
 				o+'A');
+#else
+			snprintf(mx, sizeof(mx), "Matrix %02d Mix %c Playback Volume", i+1,
+				o+'A');
+#endif
+/* HTC_AUD_END */
 			err = add_new_ctl(mixer, &usb_scarlett_ctl,
 					  scarlett_ctl_resume, 0x3c, 0x00,
 					  (i << 3) + (o & 0x07), USB_MIXER_S16,

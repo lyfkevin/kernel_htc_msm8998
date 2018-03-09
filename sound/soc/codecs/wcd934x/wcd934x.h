@@ -139,6 +139,16 @@ enum {
  * for a given speaker mode
  */
 enum {
+	SB_PORT_ERR_OF, /* SB port overflow */
+	SB_PORT_ERR_UF, /* SB port underflow */
+	SB_PORT_ERR_MAX,
+};
+
+/*
+ * Selects compander and smart boost settings
+ * for a given speaker mode
+ */
+enum {
 	WCD934X_SPKR_MODE_DEFAULT,
 	WCD934X_SPKR_MODE_1, /* COMP Gain = 12dB, Smartboost Max = 5.5V */
 };

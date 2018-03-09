@@ -478,7 +478,7 @@ struct param_data_v6 {
 #define ADM_CMD_GET_MTMX_STRTR_DEV_PARAMS_V1	0x00010368
 #define ADM_CMDRSP_GET_MTMX_STRTR_DEV_PARAMS_V1	0x00010369
 
-/* Payload of the #define ADM_CMD_SET_MTMX_STRTR_DEV_PARAMS_V1 command.
+/* Payload of the #defineÂ ADM_CMD_SET_MTMX_STRTR_DEV_PARAMS_V1 command.
  * If the data_payload_addr_lsw and data_payload_addr_msw element
  * are NULL, a series of struct param_data_v6 structures immediately
  * follows, whose total size is payload_size bytes.
@@ -9746,7 +9746,7 @@ struct afe_clk_set {
 	 * for enable and disable clock.
 	 *	"clk_freq_in_hz", "clk_attri", and "clk_root"
 	 *	are ignored in disable clock case.
-	 *	@values 
+	 *	@valuesÂ 
 	 *	- 0 -- Disabled
 	 *	- 1 -- Enabled  @tablebulletend
 	 */
@@ -10092,6 +10092,16 @@ struct afe_svc_cmd_set_clip_bank_selection {
 #define AFE_PARAM_ID_GROUP_DEVICE_CFG	0x00010255
 #define AFE_PARAM_ID_GROUP_DEVICE_ENABLE 0x00010256
 #define AFE_GROUP_DEVICE_ID_SECONDARY_MI2S_RX	0x1102
+
+/* HTC_AUD_START */
+#define HTC_POPP_TOPOLOGY				0x10000002
+#define HTC_POPP_HD_TOPOLOGY				0x10000003
+struct asm_params {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+} __packed;
+/* HTC_AUD_END */
 
 /*  Payload of the #AFE_PARAM_ID_GROUP_DEVICE_CFG
  * parameter, which configures max of 8 AFE ports
