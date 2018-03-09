@@ -549,6 +549,7 @@ static void periph_interrupt(struct spmi_pmic_arb *pa, u16 apid, bool show)
 		id = ffs(status) - 1;
 		status &= ~BIT(id);
 		irq = irq_find_mapping(pa->domain, HWIRQ(sid, per, id, apid));
+
 		if (irq == 0) {
 			cleanup_irq(pa, apid, id);
 			continue;
@@ -563,6 +564,9 @@ static void periph_interrupt(struct spmi_pmic_arb *pa, u16 apid, bool show)
 			else if (desc->action && desc->action->name)
 				name = desc->action->name;
 
+#ifdef CONFIG_HTC_POWER_DEBUG
+                        printk("[WAKEUP] Resume caused by %d triggered pmic-0x%x 0x%x 0x%x %s\n", irq, sid, per, id, name);
+#endif
 			pr_warn("spmi_show_resume_irq: %d triggered [0x%01x, 0x%02x, 0x%01x] %s\n",
 				irq, sid, per, id, name);
 		} else {
