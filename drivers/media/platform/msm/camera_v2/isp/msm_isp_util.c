@@ -2248,8 +2248,8 @@ static void msm_vfe_iommu_fault_handler(struct iommu_domain *domain,
 				__func__, iova);
 			msm_isp_process_iommu_page_fault(vfe_dev);
 		} else {
-			pr_err("%s: no handling, vfe open cnt = %d\n",
-				__func__, vfe_dev->vfe_open_cnt);
+			pr_err("%s: no handling, vfe open cnt = %d, overflow_state = %d\n",
+				__func__, vfe_dev->vfe_open_cnt, atomic_read(&vfe_dev->error_info.overflow_state));
 		}
 		mutex_unlock(&vfe_dev->core_mutex);
 	} else {
