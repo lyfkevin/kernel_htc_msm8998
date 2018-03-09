@@ -920,6 +920,57 @@ static int ufsdbg_dump_device_desc_show(struct seq_file *file, void *data)
 	return err;
 }
 
+static int ufsdbg_dump_health_desc_show(struct seq_file *file, void *data)
+{
+	int err = 0;
+	int buff_len = QUERY_DESC_HEALTH_MAX_SIZE;
+	u8 desc_buf[QUERY_DESC_HEALTH_MAX_SIZE];
+	struct ufs_hba *hba = (struct ufs_hba *)file->private;
+
+	struct desc_field_offset health_desc_field_name[] = {
+		{"bLength",				0x00, BYTE},
+		{"bDescriptorType",		0x01, BYTE},
+		{"bPreEOLInfo",			0x02, BYTE},
+		{"bDeviceLifeTimeEstA",	0x03, BYTE},
+		{"bDeviceLifeTimeEstB",	0x04, BYTE},
+		{"Reserved",				0x05, 0},
+	};
+
+	pm_runtime_get_sync(hba->dev);
+	err = ufshcd_read_health_desc(hba, desc_buf, buff_len);
+	pm_runtime_put_sync(hba->dev);
+
+	if (!err) {
+		int i;
+		struct desc_field_offset *tmp;
+		for (i = 0; i < ARRAY_SIZE(health_desc_field_name); ++i) {
+			tmp = &health_desc_field_name[i];
+
+			if (tmp->width_byte == BYTE) {
+				seq_printf(file,
+					   "Device Descriptor[Byte offset 0x%x]: %s = 0x%x\n",
+					   tmp->offset,
+					   tmp->name,
+					   (u8)desc_buf[tmp->offset]);
+			} else if (tmp->width_byte == WORD) {
+				seq_printf(file,
+					   "Device Descriptor[Byte offset 0x%x]: %s = 0x%x\n",
+					   tmp->offset,
+					   tmp->name,
+					   *(u16 *)&desc_buf[tmp->offset]);
+			} else {
+				seq_printf(file,
+				"Device Descriptor[offset 0x%x]: %s. Wrong Width = %d\n",
+				tmp->offset, tmp->name, tmp->width_byte);
+			}
+		}
+	} else {
+		seq_printf(file, "Reading Device Descriptor failed. err = %d\n",
+			   err);
+	}
+	return err;
+}
+
 static int ufsdbg_show_hba_show(struct seq_file *file, void *data)
 {
 	struct ufs_hba *hba = (struct ufs_hba *)file->private;
@@ -975,6 +1026,17 @@ static int ufsdbg_dump_device_desc_open(struct inode *inode, struct file *file)
 
 static const struct file_operations ufsdbg_dump_device_desc = {
 	.open		= ufsdbg_dump_device_desc_open,
+	.read		= seq_read,
+};
+
+static int ufsdbg_dump_health_desc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file,
+			   ufsdbg_dump_health_desc_show, inode->i_private);
+}
+
+static const struct file_operations ufsdbg_dump_health_desc = {
+	.open		= ufsdbg_dump_health_desc_open,
 	.read		= seq_read,
 };
 
@@ -1215,6 +1277,52 @@ static const struct file_operations ufsdbg_power_mode_desc = {
 	.read		= seq_read,
 	.write		= ufsdbg_power_mode_write,
 };
+
+static ssize_t ufsdbg_force_write(struct file *file,
+				const char __user *ubuf, size_t cnt,
+				loff_t *ppos)
+{
+	struct ufs_hba *hba = file->f_mapping->host->i_private;
+	char force_error[BUFF_LINE_SIZE] = {0};
+	loff_t buff_pos = 0;
+	int ret;
+	int idx = 0;
+
+	if (!hba) {
+		pr_err("hba is NULL\n");
+		return -EINVAL;
+	}
+
+	ret = simple_write_to_buffer(force_error, BUFF_LINE_SIZE,
+		&buff_pos, ubuf, cnt);
+
+	hba->force_error = force_error[idx] - '0';
+
+	return cnt;
+}
+
+
+static int ufsdbg_force_show(struct seq_file *file, void *data)
+{
+	/* Print usage */
+	seq_puts(file,
+		"FORCE test\n"
+		"\n");
+
+	return 0;
+}
+
+static int ufsdbg_force_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ufsdbg_force_show, inode->i_private);
+}
+
+static const struct file_operations ufsdbg_force_mode = {
+	.open		= ufsdbg_force_open,
+	.read		= seq_read,
+	.write		= ufsdbg_force_write,
+};
+
 
 static int ufsdbg_dme_read(void *data, u64 *attr_val, bool peer)
 {
@@ -1574,6 +1682,16 @@ void ufsdbg_add_debugfs(struct ufs_hba *hba)
 		goto err;
 	}
 
+	hba->debugfs_files.dump_health_desc =
+		debugfs_create_file("dump_health_desc", S_IRUSR,
+				    hba->debugfs_files.debugfs_root, hba,
+				    &ufsdbg_dump_health_desc);
+	if (!hba->debugfs_files.dump_health_desc) {
+		dev_err(hba->dev,
+			"%s:  NULL dump_health_desc file, exiting", __func__);
+		goto err;
+	}
+
 	hba->debugfs_files.power_mode =
 		debugfs_create_file("power_mode", S_IRUSR | S_IWUSR,
 				    hba->debugfs_files.debugfs_root, hba,
@@ -1581,6 +1699,16 @@ void ufsdbg_add_debugfs(struct ufs_hba *hba)
 	if (!hba->debugfs_files.power_mode) {
 		dev_err(hba->dev,
 			"%s:  NULL power_mode_desc file, exiting", __func__);
+		goto err;
+	}
+
+	hba->debugfs_files.force_mode =
+		debugfs_create_file("force_mode", S_IRUSR | S_IWUSR,
+				    hba->debugfs_files.debugfs_root, hba,
+				    &ufsdbg_force_mode);
+	if (!hba->debugfs_files.force_mode) {
+		dev_err(hba->dev,
+			"%s:  NULL ufsdbg_force_mode file, exiting", __func__);
 		goto err;
 	}
 
