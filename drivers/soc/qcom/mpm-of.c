@@ -575,6 +575,22 @@ void msm_mpm_exit_sleep(bool from_idle)
 			struct irq_desc *desc = apps_irq ?
 				irq_to_desc(apps_irq) : NULL;
 
+#if 0 //FIX ME 
+			const char *name = "null";
+			if (desc == NULL)
+				name = "stray irq";
+			else if (desc->action && desc->action->name)
+				name = desc->action->name;
+
+			if(strcmp(desc->irq_data.chip->name,"msmgpio")==0)
+				//FIX ME:pr_info("[WAKEUP] Resume caused by msmgpio-%lu\n", desc->irq_data.hwirq);
+
+			pr_info("%s: irq %d tirggered %s-%lu-%s", __func__,
+						apps_irq,
+						irq_desc_get_chip(desc)->name,
+						desc->irq_data.hwirq,
+						name);
+#endif
 			if (desc && !irqd_is_level_type(&desc->irq_data))
 				irq_set_irqchip_state(apps_irq,
 						IRQCHIP_STATE_PENDING, true);
@@ -656,6 +672,47 @@ static void msm_mpm_work_fn(struct work_struct *work)
 		msm_mpm_sys_low_power_modes(allow);
 	}
 }
+
+#ifdef CONFIG_HTC_POWER_DEBUG
+void gpio_show_resume_irq(void)
+{
+	unsigned long pending;
+	uint32_t *enabled_intr;
+	int i;
+	int k;
+
+
+	enabled_intr =	msm_mpm_wake_irq;
+
+	for (i = 0; i < MSM_MPM_REG_WIDTH; i++) {
+		pending = msm_mpm_read(MSM_MPM_REG_STATUS, i);
+		pending &= enabled_intr[i];
+
+		k = find_first_bit(&pending, 32);
+		while (k < 32) {
+			unsigned int mpm_irq = 32 * i + k;
+			unsigned int apps_irq = msm_mpm_get_irq_m2a(mpm_irq);
+			struct irq_desc *desc = apps_irq ? irq_to_desc(apps_irq) : NULL;
+
+			const char *name = "null";
+			if (desc == NULL)
+				name = "stray irq";
+			else if (desc->action && desc->action->name)
+				name = desc->action->name;
+
+			if(desc && (strcmp(desc->irq_data.chip->name,"msmgpio"))==0) {
+
+				pr_info("[WAKEUP] Resume caused by %s-%d, %lu tirggered %s",
+						irq_desc_get_chip(desc)->name,
+						apps_irq,
+						desc->irq_data.hwirq,
+						name);
+			}
+			k = find_next_bit(&pending, 32, k + 1);
+		}
+	}
+}
+#endif
 
 static int msm_mpm_dev_probe(struct platform_device *pdev)
 {
