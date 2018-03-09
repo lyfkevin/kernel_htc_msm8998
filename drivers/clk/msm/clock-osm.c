@@ -912,6 +912,27 @@ static struct clk_lookup cpu_clocks_osm[] = {
 	CLK_LIST(cpu_debug_mux),
 };
 
+#if defined(CONFIG_HTC_DEBUG_FOOTPRINT)
+/* get effective cpu idx by clk */
+int clk_get_cpu_idx(struct clk *c)
+{
+	/* cpu0 ~ cpu3 are power cluster. */
+	if (c == &pwrcl_clk.c)
+		return 0;
+	/* cpu4 ~ cpu7 are performance cluster. */
+	else if (c == &perfcl_clk.c)
+		return 4;
+
+	return -1;
+}
+
+int clk_get_l2_idx(struct clk *c)
+{
+	/* No L2 */
+	return -1;
+}
+#endif
+
 static unsigned long cpu_dbg_mux_get_rate(struct clk *clk)
 {
 	/* Account for the divider between the clock and the debug mux */
