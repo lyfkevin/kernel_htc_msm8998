@@ -828,6 +828,28 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	cq_host->mrq_slot[tag] = mrq;
 
+	if (mmc->perf_enable && mrq->data) {
+		if (mrq->data->flags == MMC_DATA_READ) {
+			if (mmc->perf.cmdq_read_map == 0)
+				mmc->perf.cmdq_read_start = ktime_get();
+			mmc->perf.cmdq_read_map |= 1 << tag;
+		} else {
+			if (mmc->perf.cmdq_write_map == 0)
+				mmc->perf.cmdq_write_start = ktime_get();
+			mmc->perf.cmdq_write_map |= 1 << tag;
+		}
+
+		if (mmc->perf.cmdq_read_map & mmc->perf.cmdq_write_map) {
+			pr_warn_ratelimited("%s: %s: statistic R/W map error, R: 0x%04lx, W:0x%04lx\n",
+				mmc_hostname(mmc), __func__,
+				mmc->perf.cmdq_read_map, mmc->perf.cmdq_write_map);
+			if (mrq->data->flags == MMC_DATA_READ)
+				mmc->perf.cmdq_write_map &= ~(1 << tag);
+			else
+				mmc->perf.cmdq_read_map &= ~(1 << tag);
+		}
+	}
+
 	/* PM QoS */
 	sdhci_msm_pm_qos_irq_vote(host);
 	cmdq_pm_qos_vote(host, mrq);
