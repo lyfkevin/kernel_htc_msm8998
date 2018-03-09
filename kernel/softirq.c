@@ -29,6 +29,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
+#include <linux/msm_rtb.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -280,6 +281,7 @@ restart:
 		kstat_incr_softirqs_this_cpu(vec_nr);
 
 		trace_softirq_entry(vec_nr);
+		uncached_logk(LOGK_SOFTIRQ, (void *)(h->action));
 		h->action(h);
 		trace_softirq_exit(vec_nr);
 		if (unlikely(prev_count != preempt_count())) {

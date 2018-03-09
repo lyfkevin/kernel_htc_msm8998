@@ -190,17 +190,27 @@ int sched_boost_handler(struct ctl_table *table, int write,
 	int ret;
 	unsigned int *data = (unsigned int *)table->data;
 	unsigned int old_val;
+	unsigned int new_val;
 
 	mutex_lock(&boost_mutex);
 
 	old_val = *data;
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	new_val = *data;
 
 	if (ret || !write)
 		goto done;
 
-	if (verify_boost_params(old_val, *data)) {
-		_sched_set_boost(old_val, *data);
+	if (old_val == new_val)
+		goto done;
+
+	if (old_val && new_val && new_val != old_val) {
+		_sched_set_boost(old_val, 0);
+		old_val = 0;
+	}
+
+	if (verify_boost_params(old_val, new_val)) {
+		_sched_set_boost(old_val, new_val);
 	} else {
 		*data = old_val;
 		ret = -EINVAL;
