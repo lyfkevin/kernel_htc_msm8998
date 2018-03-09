@@ -753,6 +753,61 @@ int qpnp_pin_config(int gpio, struct qpnp_pin_cfg *param)
 }
 EXPORT_SYMBOL(qpnp_pin_config);
 
+/* HTC_AUD_START */
+int qpnp_pin_pull_config(int gpio, int value)
+{
+	int rc, chip_offset;
+	struct qpnp_pin_chip *q_chip;
+	struct qpnp_pin_spec *q_spec = NULL;
+	struct gpio_chip *gpio_chip;
+
+	mutex_lock(&qpnp_pin_chips_lock);
+	list_for_each_entry(q_chip, &qpnp_pin_chips, chip_list) {
+		gpio_chip = &q_chip->gpio_chip;
+		if (gpio >= gpio_chip->base
+				&& gpio < gpio_chip->base + gpio_chip->ngpio) {
+			chip_offset = gpio - gpio_chip->base;
+			q_spec = qpnp_chip_gpio_get_spec(q_chip, chip_offset);
+			if (WARN_ON(!q_spec)) {
+				mutex_unlock(&qpnp_pin_chips_lock);
+				return -ENODEV;
+			}
+			break;
+		}
+	}
+	mutex_unlock(&qpnp_pin_chips_lock);
+
+	if (!q_spec)
+		return -ENODEV;
+
+	rc = qpnp_pin_cache_regs(q_chip, q_spec);
+	if (rc) {
+		return rc;
+	}
+
+	if (value == -1) {
+		rc = of_property_read_u32(q_spec->node, "qcom,pull", &value);
+		if (rc) {
+			pr_err("%s: of_property_read_u32 failed (%d)\n", __func__, rc);
+			return rc;
+		}
+	}
+
+	if (Q_HAVE_HW_SP(Q_PIN_CFG_PULL, q_spec, value)) {
+		q_reg_clr_set(&q_spec->regs[Q_REG_I_DIG_PULL_CTL],
+			  Q_REG_PULL_SHIFT, Q_REG_PULL_MASK,
+			  value);
+
+		rc = qpnp_pin_write_regs(q_chip, q_spec);
+		if (rc)
+			pr_err("%s: qpnp_pin_write_regs failed (%d)\n", __func__, rc);
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_pin_pull_config);
+/* HTC_AUD_END */
+
 int qpnp_pin_map(const char *name, uint32_t pmic_pin)
 {
 	struct qpnp_pin_chip *q_chip;
@@ -1444,6 +1499,72 @@ static int qpnp_pin_is_valid_pin(struct qpnp_pin_spec *q_spec)
 
 	return 0;
 }
+
+#ifdef CONFIG_HTC_POWER_DEBUG
+int qpnp_pin_dump(struct seq_file *m, int curr_len, char *gpio_buffer)
+{
+        int i, j, rc;
+        u64 value;
+        enum qpnp_pin_param_type type;
+        const char *filename;
+        int len;
+        char read_buf[256];
+        char *title_msg = "---------- QPNP PIN ---------";
+        struct qpnp_pin_chip *q_chip;
+        struct qpnp_pin_spec *q_spec;
+
+        if (m)
+                seq_printf(m, "%s\n", title_msg);
+        else {
+                pr_info("%s\n", title_msg);
+                curr_len += sprintf(gpio_buffer + curr_len,
+                "%s\n", title_msg);
+        }
+        list_for_each_entry(q_chip, &qpnp_pin_chips, chip_list) {
+                if (m)
+                        seq_printf(m, "%s\n", q_chip->gpio_chip.label);
+                else {
+                        pr_info("%s\n", q_chip->gpio_chip.label);
+                        curr_len += sprintf(gpio_buffer + curr_len,
+                        "%s\n", q_chip->gpio_chip.label);
+                }
+
+                for (i = 0; i < q_chip->gpio_chip.ngpio; i++) {
+                        memset(read_buf, 0, sizeof(read_buf));
+                        len = 0;
+                        q_spec = qpnp_chip_gpio_get_spec(q_chip, i);
+                        if (q_spec->type == Q_GPIO_TYPE)
+                                len += sprintf(read_buf + len, "GPIO[%2d]: ", q_spec->pmic_pin);
+                        else
+                                len += sprintf(read_buf + len, "MPP[%2d]: ", q_spec->pmic_pin);
+
+                        for (j = 0; j < Q_NUM_PARAMS; j++) {
+                                type = dfs_args[j].type;
+                                filename = dfs_args[j].filename;
+
+                                rc = qpnp_pin_check_config(type, q_spec, 0);
+                                if (rc == -ENXIO)
+                                        continue;
+
+                                qpnp_pin_debugfs_get(&q_spec->params[type], &value);
+                                len += sprintf(read_buf + len, "[%s]%llu ", filename, value);
+                        }
+
+                        read_buf[255] = '\0';
+                        if (m)
+                                seq_printf(m, "%s\n", read_buf);
+                        else {
+                                pr_info("%s\n", read_buf);
+                                curr_len += sprintf(gpio_buffer +
+                                curr_len, "%s\n", read_buf);
+                        }
+                }
+        }
+
+        return curr_len;
+}
+EXPORT_SYMBOL_GPL(qpnp_pin_dump);
+#endif
 
 static int qpnp_pin_probe(struct platform_device *pdev)
 {
