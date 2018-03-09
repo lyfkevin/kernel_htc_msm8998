@@ -36,6 +36,7 @@
 #include <linux/pstore_ram.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/htc_debug_tools.h>
 
 #define RAMOOPS_KERNMSG_HDR "===="
 #define MIN_MEM_SIZE 4096UL
@@ -694,6 +695,13 @@ static int ramoops_probe(struct platform_device *pdev)
 		cxt->size, (unsigned long long)cxt->phys_addr,
 		cxt->ecc_info.ecc_size, cxt->ecc_info.block_size);
 
+#if defined(CONFIG_HTC_DEBUG_BOOTLOADER_LOG)
+	if (cxt->console_size)
+	{
+		bldr_log_init();
+	}
+#endif
+
 	return 0;
 
 fail_buf:
@@ -724,6 +732,10 @@ static int ramoops_remove(struct platform_device *pdev)
 	persistent_ram_free(cxt->fprz);
 	persistent_ram_free(cxt->cprz);
 	ramoops_free_przs(cxt);
+
+#if defined(CONFIG_HTC_DEBUG_BOOTLOADER_LOG)
+	bldr_log_release();
+#endif
 
 	return 0;
 }
