@@ -78,4 +78,5 @@ ifneq ($(CONFIG_NET_L3_MASTER_DEV),)
 obj-y				+= l3mdev/
 endif
 obj-$(CONFIG_IPC_ROUTER)	+= ipc_router/
+obj-$(CONFIG_HTC_NET_DEBUG)	+= htc_net_debug.o
 obj-$(CONFIG_RMNET_DATA) += rmnet_data/

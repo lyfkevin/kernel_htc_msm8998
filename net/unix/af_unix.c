@@ -118,6 +118,21 @@
 #include <linux/security.h>
 #include <linux/freezer.h>
 
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+#include <net/htc_net_debug.h>
+
+#define THRESHOLD_TIME_MS 200
+
+struct xtables_lock_info {
+	const struct sock* sk;
+	ktime_t time_start, time_end;
+};
+static struct xtables_lock_info xt_lock_info;
+
+static int xshare_lock_idx = -1;
+static int xshare_unlock_idx = -1;
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
+
 struct hlist_head unix_socket_table[2 * UNIX_HASH_SIZE];
 EXPORT_SYMBOL_GPL(unix_socket_table);
 DEFINE_SPINLOCK(unix_table_lock);
@@ -832,6 +847,38 @@ static int unix_release(struct socket *sock)
 	if (!sk)
 		return 0;
 
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+	if(xt_lock_info.sk == sk)
+	{
+		u32 time_elapsed_ms;
+		xt_lock_info.time_end = ktime_get();
+		time_elapsed_ms = ktime_to_ms(ktime_sub(xt_lock_info.time_end, xt_lock_info.time_start));
+
+		if(time_elapsed_ms >= THRESHOLD_TIME_MS)
+		{
+			pr_info("[NET] xshare_unlock by [%d,%s], parent=[%d,%s], sk=[%p], start,end,hold time=[%lld,%lld,%d](ms)\n",
+				current->pid,
+				current->comm,
+				(current->parent) ? current->parent->pid : 0,
+				(current->parent) ? current->parent->comm : "(Invalid)",
+				sk,
+				ktime_to_ms(xt_lock_info.time_start),
+				ktime_to_ms(xt_lock_info.time_end),
+				time_elapsed_ms
+			);
+		}
+
+		net_dbg_log_event_oneline(xshare_unlock_idx, "xshare_unlock by [%d,%s], parent=[%d,%s], sk=[%p]",
+			current->pid,
+			current->comm,
+			(current->parent) ? current->parent->pid : 0,
+			(current->parent) ? current->parent->comm : "(Invalid)",
+			sk
+		);
+		memset(&xt_lock_info, 0, sizeof(struct xtables_lock_info));
+	}
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
+
 	unix_release_sock(sk, 0);
 	sock->sk = NULL;
 
@@ -1054,6 +1101,30 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 			unix_release_addr(addr);
 			goto out_unlock;
 		}
+
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+		do{
+			struct sockaddr_un saddr_un = {0};
+			memcpy(&saddr_un, uaddr, addr_len);
+
+			// ip[6]tables acquires xtables lock
+			// abstract socket address[0] is a null byte ('\0')
+			if(strcmp(&saddr_un.sun_path[1], "xtables") != 0)
+				break;
+
+			memset(&xt_lock_info, 0, sizeof(struct xtables_lock_info));
+			xt_lock_info.sk = sk;
+			xt_lock_info.time_start = ktime_get();
+
+			net_dbg_log_event_oneline(xshare_lock_idx, "xshare_lock by [%d,%s], parent=[%d,%s], sk=[%p]",
+					current->pid,
+					current->comm,
+					(current->parent) ? current->parent->pid : 0,
+					(current->parent) ? current->parent->comm : "(Invalid)",
+					sk
+			);
+		} while(0);
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
 
 		list = &unix_socket_table[addr->hash];
 	}
@@ -2916,6 +2987,12 @@ static int __init af_unix_init(void)
 
 	sock_register(&unix_family_ops);
 	register_pernet_subsys(&unix_net_ops);
+
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+	xshare_lock_idx = net_dbg_get_free_log_event_oneline();
+	xshare_unlock_idx = net_dbg_get_free_log_event_oneline();
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
+
 out:
 	return rc;
 }
