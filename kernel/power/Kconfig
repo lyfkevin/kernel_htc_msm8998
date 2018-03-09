@@ -322,3 +322,9 @@ config PM_GENERIC_DOMAINS_OF
 
 config CPU_PM
 	bool
+
+config HTC_PNPMGR
+	  bool "Htc Power and Performance manager"
+	  depends on PM
+	  ---help---
+	  Collect the sysfs files nodes for pnpmgr usage.
