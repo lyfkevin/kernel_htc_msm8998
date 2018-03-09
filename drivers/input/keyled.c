@@ -1,4 +1,4 @@
-/* drivers/input/keyreset.c
+/* drivers/input/keyled.c
  *
  * Copyright (C) 2014 Google, Inc.
  *
@@ -15,7 +15,7 @@
 
 #include <linux/input.h>
 #include <linux/of_gpio.h>
-#include <linux/keyreset.h>
+#include <linux/keyled.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
@@ -24,52 +24,35 @@
 #include <linux/syscalls.h>
 #include <linux/keycombo.h>
 
-static unsigned int vzw_key_flag = 0;
-
-struct keyreset_state {
-	int restart_requested;
-	int (*reset_fn)(void);
+struct keyled_state {
 	struct platform_device *pdev_child;
-	struct work_struct restart_work;
 };
 
-static void do_restart(struct work_struct *unused)
+extern void virtual_key_led_reset_blink(int onoff);
+static void keep_led_blink(struct work_struct *);
+DECLARE_WORK(led_blink_work, &keep_led_blink);
+static void keep_led_blink(struct work_struct *dummy)
 {
-#if defined(CONFIG_POWER_KEY_CLR_RESET)
-	clear_hw_reset();
-#endif
-	KEY_LOGI("[PWR] Show Blocked State -- long press power key\n");
-	show_state_filter(TASK_UNINTERRUPTIBLE);
-	orderly_cmd_reboot("power-key-force-hard");
+	KEY_LOGI("%s: start blinking!\n", __func__);
+	virtual_key_led_reset_blink(1);
+}
+static void virtual_key_led_blink(void *dummy)
+{
+	schedule_work(&led_blink_work);
+}
+static void stop_led_blink(void *dummy)
+{
+	cancel_work_sync(&led_blink_work);
+	KEY_LOGI("%s: stop blinking!\n", __func__);
+	virtual_key_led_reset_blink(0);
 }
 
-static void do_reset_fn(void *priv)
-{
-	struct keyreset_state *state = priv;
-	if (state->restart_requested)
-		panic("[KEY] keyboard reset failed, %d", state->restart_requested);
-	if (state->reset_fn) {
-		KEY_LOGI("keyboard reset\n");
-		state->restart_requested = state->reset_fn();
-	} else {
-		KEY_LOGI("keyboard reset (default)\n");
-		schedule_work(&state->restart_work);
-		state->restart_requested = 1;
-	}
-}
-
-static int keyreset_parse_dt(struct device_node *dt,
-		struct keyreset_platform_data *pdata)
+static int keyled_parse_dt(struct device_node *dt,
+		struct keyled_platform_data *pdata)
 {
 	int ret = 0, cnt = 0, num_keys;
 	struct property *prop;
 	char parser_st[3][15] = {"key_down_delay", "keys_down", "keys_up"};
-
-	if (vzw_key_flag) {
-		KEY_LOGI("DT: customize\n");
-		snprintf(parser_st[1], 15, "vzw_keys_down");
-		snprintf(parser_st[2], 15, "vzw_keys_up");
-	}
 
 	/* Parse key_down_delay */
 	if (of_property_read_u32(dt, parser_st[0], &pdata->key_down_delay))
@@ -143,49 +126,52 @@ err_parse_keys_down_failed:
 	return ret;
 }
 
-static int keyreset_probe(struct platform_device *pdev)
+static int keyled_probe(struct platform_device *pdev)
 {
 	int ret = -ENOMEM;
 	struct keycombo_platform_data *pdata_child;
-	struct keyreset_platform_data *pdata;
+	struct keyled_platform_data *pdata;
 	int up_size = 0, down_size = 0, size;
 	int key, *keyp;
-	struct keyreset_state *state;
+	struct keyled_state *state;
 
 	KEY_LOGI("%s: +++\n", __func__);
 
 	if (pdev->dev.of_node) {
-		pdata = kzalloc(sizeof(struct keyreset_platform_data), GFP_KERNEL);
+		pdata = kzalloc(sizeof(struct keyled_platform_data), GFP_KERNEL);
 		if (!pdata) {
-			KEY_LOGE("[KEY] fail to allocate keyreset_platform_data\n");
+			KEY_LOGE("[KEY] fail to allocate keyled_platform_data\n");
 			ret = -ENOMEM;
 			goto err_get_pdata_fail;
 		}
-		ret = keyreset_parse_dt(pdev->dev.of_node, pdata);
+		ret = keyled_parse_dt(pdev->dev.of_node, pdata);
 		if (ret < 0) {
-			KEY_LOGE("[KEY] keyreset_parse_dt fail\n");
+			KEY_LOGE("[KEY] keyled_parse_dt fail\n");
 			ret = -ENOMEM;
 			goto err_parse_fail;
 		}
 	} else {
 		pdata = pdev->dev.platform_data;
 		if(!pdata) {
-			KEY_LOGE("[KEY] keyreset_platform_data does not exist\n");
+			KEY_LOGE("[KEY] keyled_platform_data does not exist\n");
 			ret = -ENOMEM;
 			goto err_get_pdata_fail;
 		}
 	}
 
 	state = devm_kzalloc(&pdev->dev, sizeof(*state), GFP_KERNEL);
-	if (!state)
-		return -ENOMEM;
+	if (!state) {
+		ret = -ENOMEM;
+		goto err_parse_fail;
+	}
 
 	state->pdev_child = platform_device_alloc(KEYCOMBO_NAME,
 							PLATFORM_DEVID_AUTO);
-	if (!state->pdev_child)
-		return -ENOMEM;
+	if (!state->pdev_child) {
+		ret = -ENOMEM;
+		goto err_parse_fail;
+	}
 	state->pdev_child->dev.parent = &pdev->dev;
-	INIT_WORK(&state->restart_work, do_restart);
 
 	keyp = pdata->keys_down;
 	while ((key = *keyp++)) {
@@ -227,8 +213,8 @@ static int keyreset_probe(struct platform_device *pdev)
 		if (!pdata_child->keys_up)
 			goto error;
 	}
-	state->reset_fn = pdata->reset_fn;
-	pdata_child->key_down_fn = do_reset_fn;
+	pdata_child->key_down_fn = &virtual_key_led_blink;
+	pdata_child->key_up_fn = &stop_led_blink;
 	pdata_child->priv = state;
 	pdata_child->key_down_delay = pdata->key_down_delay;
 	ret = platform_device_add_data(state->pdev_child, pdata_child, size);
@@ -242,55 +228,54 @@ static int keyreset_probe(struct platform_device *pdev)
 error:
 	platform_device_put(state->pdev_child);
 err_parse_fail:
-	if (pdev->dev.of_node)
+	if (pdev->dev.of_node) {
+		if(pdata->keys_up)
+			kfree(pdata->keys_up);
+		if(pdata->keys_down)
+			kfree(pdata->keys_down);
 		kfree(pdata);
+	}
+
 err_get_pdata_fail:
 	return ret;
 }
 
-int keyreset_remove(struct platform_device *pdev)
+int keyled_remove(struct platform_device *pdev)
 {
-	struct keyreset_state *state = platform_get_drvdata(pdev);
+	struct keyled_state *state = platform_get_drvdata(pdev);
 	platform_device_put(state->pdev_child);
 	return 0;
 }
 
 #ifdef CONFIG_OF
-static const struct of_device_id keyreset_mttable[] = {
-	{ .compatible = KEYRESET_NAME},
+static const struct of_device_id keyled_mttable[] = {
+	{ .compatible = KEYLED_NAME},
 	{},
 };
 #else
-#define keyreset_mttable NULL
+#define keyled_mttable NULL
 #endif
 
-struct platform_driver keyreset_driver = {
-	.probe = keyreset_probe,
-	.remove = keyreset_remove,
+struct platform_driver keyled_driver = {
+	.probe = keyled_probe,
+	.remove = keyled_remove,
 	.driver = {
-		.name = KEYRESET_NAME,
+		.name = KEYLED_NAME,
 		.owner = THIS_MODULE,
-		.of_match_table = keyreset_mttable,
+		.of_match_table = keyled_mttable,
 	},
 };
 
-static int __init keyreset_init(void)
+static int __init keyled_init(void)
 {
-	return platform_driver_register(&keyreset_driver);
+	return platform_driver_register(&keyled_driver);
 }
 
-static void __exit keyreset_exit(void)
+static void __exit keyled_exit(void)
 {
-	return platform_driver_unregister(&keyreset_driver);
+	return platform_driver_unregister(&keyled_driver);
 }
 
-module_init(keyreset_init);
-module_exit(keyreset_exit);
+module_init(keyled_init);
+module_exit(keyled_exit);
 
-static int __init vzw_key_enable_flag(char *str)
-{
-	int ret = kstrtouint(str, 0, &vzw_key_flag);
-	pr_info("vzw_key_enable %d: %d from %s",
-			ret, vzw_key_flag, str);
-	return ret;
-} early_param("vzw_key_enable", vzw_key_enable_flag);

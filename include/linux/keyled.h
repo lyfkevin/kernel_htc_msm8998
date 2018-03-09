@@ -14,19 +14,15 @@
  *
  */
 
-#ifndef _LINUX_KEYRESET_H
-#define _LINUX_KEYRESET_H
+#ifndef _LINUX_KEYLED_H
+#define _LINUX_KEYLED_H
 
-#define KEYRESET_NAME "keyreset"
+#define KEYLED_NAME "keyled"
 
-struct keyreset_platform_data {
-	int (*reset_fn)(void);
+struct keyled_platform_data {
 	uint32_t key_down_delay;
 	uint32_t *keys_up;
 	uint32_t *keys_down; /* 0 terminated */
-	/* for vzw */
-	uint32_t *vzw_keys_up;
-	uint32_t *vzw_keys_down; /* 0 terminated */
 };
 
-#endif /* _LINUX_KEYRESET_H */
+#endif /* _LINUX_KEYLED_H */
