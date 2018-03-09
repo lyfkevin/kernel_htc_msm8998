@@ -1167,6 +1167,15 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	    value == field->value[usage->usage_index])
 		return;
 
+/* HTC_AUD_START */
+	if ((usage->code == KEY_VOLUMEDOWN) ||
+		(usage->code == KEY_VOLUMEUP) ||
+		(usage->code == KEY_NEXTSONG) ||
+		(usage->code == KEY_PLAYPAUSE) ||
+		(usage->code == KEY_PREVIOUSSONG) ||
+		(usage->code == KEY_MEDIA))
+		printk(KERN_INFO "[HID] %s: usage->hid:%x, type:%d, code:%d, value:%d\n", __func__, usage->hid, usage->type, usage->code, value);
+/* HTC_AUD_END */
 	/* report the usage code as scancode if the key status has changed */
 	if (usage->type == EV_KEY &&
 	    (!test_bit(usage->code, input->key)) == value)
