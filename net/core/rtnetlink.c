@@ -57,6 +57,16 @@
 #include <net/rtnetlink.h>
 #include <net/net_namespace.h>
 
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+#include <net/htc_net_debug.h>
+
+#define THRESHOLD_TIME_MS 500
+
+static int rtnl_lock_idx = -1;
+static int rtnl_unlock_idx = -1;
+static ktime_t time_start, time_end;
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
+
 struct rtnl_link {
 	rtnl_doit_func		doit;
 	rtnl_dumpit_func	dumpit;
@@ -68,12 +78,47 @@ static DEFINE_MUTEX(rtnl_mutex);
 void rtnl_lock(void)
 {
 	mutex_lock(&rtnl_mutex);
+
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+	time_start = ktime_get();
+
+	if (current->real_parent) {
+		net_dbg_log_event_oneline(rtnl_lock_idx, "rtnl_lock by [%d,%s], parent=[%d,%s]", current->pid, current->comm, current->real_parent->pid, current->real_parent->comm);
+	} else {
+		net_dbg_log_event_oneline(rtnl_lock_idx, "rtnl_lock by [%d,%s]", current->pid, current->comm);
+	}
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
 }
 EXPORT_SYMBOL(rtnl_lock);
 
 void __rtnl_unlock(void)
 {
 	mutex_unlock(&rtnl_mutex);
+
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+	time_end = ktime_get();
+	do{
+		u32 time_elapsed_ms;
+		time_elapsed_ms = ktime_to_ms(ktime_sub(time_end, time_start));
+		if(time_elapsed_ms >= THRESHOLD_TIME_MS)
+		{
+			pr_info("[NET] __rtnl_unlock by [%d,%s], parent=[%d,%s], start,end,hold time=[%lld,%lld,%d](ms)\n",
+				current->pid,
+				current->comm,
+				current->real_parent->pid,
+				current->real_parent->comm,
+				ktime_to_ms(time_start),
+				ktime_to_ms(time_end),
+				time_elapsed_ms);
+		}
+	} while(0);
+
+	if (current->real_parent) {
+		net_dbg_log_event_oneline(rtnl_unlock_idx, "__rtnl_unlock by [%d,%s], parent=[%d,%s]", current->pid, current->comm, current->real_parent->pid, current->real_parent->comm);
+	} else {
+		net_dbg_log_event_oneline(rtnl_unlock_idx, "__rtnl_unlock by [%d,%s]", current->pid, current->comm);
+	}
+#endif /* CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY */
 }
 
 void rtnl_unlock(void)
@@ -3535,4 +3580,9 @@ void __init rtnetlink_init(void)
 	rtnl_register(PF_BRIDGE, RTM_GETLINK, NULL, rtnl_bridge_getlink, NULL);
 	rtnl_register(PF_BRIDGE, RTM_DELLINK, rtnl_bridge_dellink, NULL, NULL);
 	rtnl_register(PF_BRIDGE, RTM_SETLINK, rtnl_bridge_setlink, NULL, NULL);
+
+#if CONFIG_HTC_NET_DEBUG && CONFIG_HTC_NETWORK_MODIFY
+	rtnl_lock_idx = net_dbg_get_free_log_event_oneline();
+	rtnl_unlock_idx = net_dbg_get_free_log_event_oneline();
+#endif
 }
