@@ -309,9 +309,20 @@ int pil_do_ramdump(struct pil_desc *desc,
 	ret = do_elf_ramdump(ramdump_dev, ramdump_segs, count);
 	kfree(ramdump_segs);
 
+#if defined(CONFIG_HTC_DEBUG_SSR)
+	/* Modem_BSP trigger KP if SSR ramdump collection failure */
+	if (ret) {
+		pil_err(desc, "%s: Ramdump collection failed for subsys %s rc:%d\n",
+				__func__, desc->name, ret);
+		if (!strncmp(desc->name, "modem", 5))
+			panic("Trigger KP for ramdump_%s collection failure",
+				desc->name);
+	}
+#else
 	if (ret)
 		pil_err(desc, "%s: Ramdump collection failed for subsys %s rc:%d\n",
 				__func__, desc->name, ret);
+#endif
 
 	if (desc->subsys_vmid > 0)
 		ret = pil_assign_mem_to_subsys(desc, priv->region_start,
@@ -1079,6 +1090,8 @@ out:
 					&desc->attrs);
 			priv->region = NULL;
 		}
+		if (desc->clear_fw_region)
+			pil_clear_segment(desc);
 		pil_release_mmap(desc);
 	}
 	return ret;

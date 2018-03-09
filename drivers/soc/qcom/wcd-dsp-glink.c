@@ -24,6 +24,10 @@
 #include <linux/vmalloc.h>
 #include <soc/qcom/glink.h>
 #include "sound/wcd-dsp-glink.h"
+/* HTC_AUD_START */
+#include <linux/vmalloc.h>
+#include <linux/mm.h>
+/* HTC_AUD_END */
 
 #define WDSP_GLINK_DRIVER_NAME "wcd-dsp-glink"
 #define WDSP_MAX_WRITE_SIZE (256 * 1024)
