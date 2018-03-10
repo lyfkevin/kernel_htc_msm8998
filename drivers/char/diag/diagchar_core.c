@@ -3287,7 +3287,7 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 {
 	struct diag_dci_client_tbl *entry;
 	struct list_head *start, *temp;
-	int index = -1, i = 0, ret = 0, timeout = 0, w_ret = 0;
+	int index = -1, i = 0, ret = 0;
 	int data_type;
 	int copy_dci_data = 0;
 	int exit_stat = 0;
