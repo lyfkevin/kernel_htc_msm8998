@@ -8795,14 +8795,14 @@ int htc_set_asm_effect(void* payload, int total_size, int topology, bool hd_supp
 {
 	int n;
 	for (n = 1; n <= ASM_ACTIVE_STREAMS_ALLOWED; n++) {
-		if (session[n] && ((session[n]->io_mode & COMPRESSED_STREAM_IO))) {
-			if (session[n]->topology == topology) {
-				q6asm_send_audio_effects_params(session[n], payload,
+		if (session[n].ac && ((session[n].ac->io_mode & COMPRESSED_STREAM_IO))) {
+			if (session[n].ac->topology == topology) {
+				q6asm_send_audio_effects_params(session[n].ac, payload,
 					total_size);
 				return 0;
-			} else if ((session[n]->topology == HTC_POPP_HD_TOPOLOGY)
+			} else if ((session[n].ac->topology == HTC_POPP_HD_TOPOLOGY)
 				&& hd_support) {
-				q6asm_send_audio_effects_params(session[n], payload,
+				q6asm_send_audio_effects_params(session[n].ac, payload,
 					total_size);
 				return 0;
 			}
