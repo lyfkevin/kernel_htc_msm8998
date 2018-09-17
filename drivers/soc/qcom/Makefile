@@ -102,6 +102,8 @@ obj-$(CONFIG_MSM_RPM_RBCPR_STATS_V2_LOG) += rpm_rbcpr_stats_v2.o
 obj-$(CONFIG_MSM_RPM_STATS_LOG) += rpm_stats.o rpm_master_stat.o rpm_rail_stats.o system_stats.o
 obj-$(CONFIG_MSM_RPM_LOG) += rpm_log.o
 obj-y += rpm_stats_ver.o
+obj-$(CONFIG_STATE_NOTIFIER)   += state_notifier.o
+
 obj-$(CONFIG_QSEE_IPC_IRQ_BRIDGE) += qsee_ipc_irq_bridge.o
 obj-$(CONFIG_WCD_DSP_GLINK) += wcd-dsp-glink.o
 obj-$(CONFIG_QCOM_SMCINVOKE) += smcinvoke.o
