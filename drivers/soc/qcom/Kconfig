@@ -960,4 +960,11 @@ config MSM_CACHE_M4M_ERP64_PANIC_ON_UE
          Say 'Y' here to cause kernel panic when uncorrectable cache/M4M errors
          are detected.
 
+config STATE_NOTIFIER
+	bool "State Notifier"
+	default n
+	help
+	  A unified display state notifier for kernel drivers for easy porting
+	  between different devices.
+
 source "drivers/soc/qcom/memshare/Kconfig"
