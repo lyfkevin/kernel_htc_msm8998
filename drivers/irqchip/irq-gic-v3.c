@@ -427,6 +427,8 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	u32 pending[32];
 	void __iomem *base = gic_data_dist_base(gic);
 	msm_show_resume_irq_mask = 1;
+
+#ifdef CONFIG_QCOM_SHOW_RESUME_IRQ
 	if (!msm_show_resume_irq_mask)
 		return;
 
@@ -457,6 +459,7 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		pr_warn("%s: %d triggered %s\n", __func__, irq, name);
 #endif
 	}
+#endif
 }
 
 static void gic_resume_one(struct gic_chip_data *gic)

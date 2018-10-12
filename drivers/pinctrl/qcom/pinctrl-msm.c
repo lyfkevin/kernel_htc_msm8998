@@ -1161,6 +1161,7 @@ static void msm_pinctrl_resume(void)
 	const char *name = "null";
 	struct msm_pinctrl *pctrl = msm_pinctrl_data;
 
+#ifdef CONFIG_QCOM_SHOW_RESUME_IRQ
 	if (!msm_show_resume_irq_mask)
 		return;
 
@@ -1180,6 +1181,7 @@ static void msm_pinctrl_resume(void)
 		}
 	}
 	spin_unlock_irqrestore(&pctrl->lock, flags);
+#endif
 }
 #else
 #define msm_pinctrl_suspend NULL
