@@ -131,3 +131,5 @@ obj-$(CONFIG_EFIVAR_FS)		+= efivarfs/
 
 obj-$(CONFIG_HTC_FD_MONITOR)	+= fd_monitor.o
 obj-y                           += iotop/
+
+obj-$(CONFIG_DYNAMIC_FSYNC)	+= dyn_sync_cntrl.o
