@@ -2895,11 +2895,11 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 			update_vht_opmode->dot11_mode);
 
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
-			WMI_PEER_PHYMODE, chan_mode,
+			WMI_PEER_CHWIDTH, update_vht_opmode->opMode,
 			update_vht_opmode->smesessionId);
 
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
-			WMI_PEER_CHWIDTH, update_vht_opmode->opMode,
+			WMI_PEER_PHYMODE, chan_mode,
 			update_vht_opmode->smesessionId);
 }
 
@@ -3280,6 +3280,13 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 			cds_pkt_return_packet(rx_pkt);
 			return -EINVAL;
 		}
+	if (qdf_nbuf_len(wbuf) < (sizeof(*wh) + IEEE80211_CCMP_HEADERLEN +
+						IEEE80211_CCMP_MICLEN)) {
+		WMA_LOGE("Buffer length less than expected %d ",
+						(int)qdf_nbuf_len(wbuf));
+		cds_pkt_return_packet(rx_pkt);
+		return -EINVAL;
+	}
 
 		orig_hdr = (uint8_t *) qdf_nbuf_data(wbuf);
 		/* Pointer to head of CCMP header */

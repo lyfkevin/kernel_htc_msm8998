@@ -1120,7 +1120,7 @@ QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
 		WMITLV_TAG_STRUC_wmi_request_stats_cmd_fixed_param,
 		WMITLV_GET_STRUCT_TLVLEN(wmi_request_stats_cmd_fixed_param));
 
-	cmd->stats_id = WMI_REQUEST_PEER_STAT;
+	cmd->stats_id = WMI_REQUEST_PEER_STAT | WMI_REQUEST_PEER_EXTD_STAT;
 	cmd->vdev_id = peer_info_req->sessionid;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_info_req->peer_macaddr.bytes,
 				&cmd->peer_macaddr);
@@ -10285,7 +10285,8 @@ int wma_get_arp_stats_handler(void *handle, uint8_t *data,
 			connect_stats_event->icmpv4_rsp_recvd);
 	}
 
-	mac->sme.get_arp_stats_cb(mac->hHdd, &rsp);
+	mac->sme.get_arp_stats_cb(mac->hHdd, &rsp,
+				  mac->sme.get_arp_stats_context);
 
 	EXIT();
 
@@ -10618,6 +10619,11 @@ int wma_peer_ant_info_evt_handler(void *handle, u_int8_t *event,
 		return -EINVAL;
 	}
 
+	if (!pmac->sme.pchain_rssi_ind_cb) {
+		WMA_LOGE("%s: callback not registered", __func__);
+		return -EINVAL;
+	}
+
 	param_buf = (WMI_PEER_ANTDIV_INFO_EVENTID_param_tlvs *) event;
 	if (!param_buf) {
 		WMA_LOGE("Invalid peer_ant_info event buffer");
@@ -10643,7 +10649,8 @@ int wma_peer_ant_info_evt_handler(void *handle, u_int8_t *event,
 				peer_ant_info->chain_rssi,
 				sizeof(peer_ant_info->chain_rssi));
 
-	pmac->sme.pchain_rssi_ind_cb(pmac->hHdd, &chain_rssi_result);
+	pmac->sme.pchain_rssi_ind_cb(pmac->hHdd, &chain_rssi_result,
+				     pmac->sme.pchain_rssi_ind_ctx);
 
 	return 0;
 }
@@ -10675,7 +10682,10 @@ void wma_spectral_scan_config(WMA_HANDLE wma_handle,
 
 	if (wma == NULL)
 		return;
-
+	if (!wma_is_vdev_valid(req->vdev_id)) {
+		WMA_LOGE(FL("Invalid vdev id"));
+		return;
+	}
 	/* save the copy of the config params */
 	qdf_mem_copy(&wma->ss_configs, req, sizeof(*req));
 
@@ -10761,4 +10771,52 @@ int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
 	WMA_LOGD("%s: stats ext event Posted to SME", __func__);
 
 	return 0;
+}
+
+
+bool wma_dual_beacon_on_single_mac_scc_capable(void)
+{
+	tp_wma_handle wma_handle = NULL;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (NULL == wma_handle) {
+		WMA_LOGE("%s : Failed to get wma_handle", __func__);
+		return false;
+	}
+	if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		wma_handle->wmi_service_ext_bitmap,
+		WMI_SERVICE_DUAL_BEACON_ON_SINGLE_MAC_SCC_SUPPORT)) {
+		WMA_LOGD("Support dual beacon on same channel on single MAC");
+		return true;
+	}
+	if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		wma_handle->wmi_service_ext_bitmap,
+		WMI_SERVICE_DUAL_BEACON_ON_SINGLE_MAC_MCC_SUPPORT)) {
+		WMA_LOGD("Support dual beacon on both different and same channel on single MAC");
+		return true;
+	} else {
+		WMA_LOGD("Not support dual beacon on same channel on single MAC");
+		return false;
+	}
+}
+
+bool wma_dual_beacon_on_single_mac_mcc_capable(void)
+{
+	tp_wma_handle wma_handle = NULL;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (NULL == wma_handle) {
+		WMA_LOGE("%s : Failed to get wma_handle", __func__);
+		return false;
+	}
+
+	if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		wma_handle->wmi_service_ext_bitmap,
+		WMI_SERVICE_DUAL_BEACON_ON_SINGLE_MAC_MCC_SUPPORT)) {
+		WMA_LOGD("Support dual beacon on different channel on single MAC");
+		return true;
+	} else {
+		WMA_LOGD("Not support dual beacon on different channel on single MAC");
+		return false;
+	}
 }
