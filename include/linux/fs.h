@@ -612,6 +612,8 @@ struct posix_acl;
 #define IOP_FASTPERM	0x0001
 #define IOP_LOOKUP	0x0002
 #define IOP_NOFOLLOW	0x0004
+#define UMOUNT_WAIT	0x00000010	/* Wait to unmount completely */
+
 
 #define AID_SDCARD_RW 1015
 #define AID_SDCARD_R  1028
