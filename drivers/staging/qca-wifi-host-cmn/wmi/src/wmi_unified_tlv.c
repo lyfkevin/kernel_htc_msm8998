@@ -4562,6 +4562,8 @@ QDF_STATUS send_roam_scan_offload_mode_cmd_tlv(wmi_unified_t wmi_handle,
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	int auth_mode = roam_req->auth_mode;
+	roam_offload_param *req_offload_params =
+		&roam_req->roam_offload_params;
 	wmi_roam_offload_tlv_param *roam_offload_params;
 	wmi_roam_11i_offload_tlv_param *roam_offload_11i;
 	wmi_roam_11r_offload_tlv_param *roam_offload_11r;
@@ -4684,31 +4686,31 @@ QDF_STATUS send_roam_scan_offload_mode_cmd_tlv(wmi_unified_t wmi_handle,
 		roam_offload_params->select_5g_margin =
 			roam_req->select_5ghz_margin;
 		roam_offload_params->handoff_delay_for_rx =
-			roam_req->roam_offload_params.ho_delay_for_rx;
+			req_offload_params->ho_delay_for_rx;
+		roam_offload_params->max_mlme_sw_retries =
+			req_offload_params->roam_preauth_retry_count;
+		roam_offload_params->no_ack_timeout =
+			req_offload_params->roam_preauth_no_ack_timeout;
 		roam_offload_params->reassoc_failure_timeout =
 			roam_req->reassoc_failure_timeout;
 
 		/* Fill the capabilities */
 		roam_offload_params->capability =
-				roam_req->roam_offload_params.capability;
+				req_offload_params->capability;
 		roam_offload_params->ht_caps_info =
-				roam_req->roam_offload_params.ht_caps_info;
+				req_offload_params->ht_caps_info;
 		roam_offload_params->ampdu_param =
-				roam_req->roam_offload_params.ampdu_param;
+				req_offload_params->ampdu_param;
 		roam_offload_params->ht_ext_cap =
-				roam_req->roam_offload_params.ht_ext_cap;
-		roam_offload_params->ht_txbf =
-				roam_req->roam_offload_params.ht_txbf;
-		roam_offload_params->asel_cap =
-				roam_req->roam_offload_params.asel_cap;
-		roam_offload_params->qos_caps =
-				roam_req->roam_offload_params.qos_caps;
+				req_offload_params->ht_ext_cap;
+		roam_offload_params->ht_txbf = req_offload_params->ht_txbf;
+		roam_offload_params->asel_cap = req_offload_params->asel_cap;
+		roam_offload_params->qos_caps = req_offload_params->qos_caps;
 		roam_offload_params->qos_enabled =
-				roam_req->roam_offload_params.qos_enabled;
-		roam_offload_params->wmm_caps =
-				roam_req->roam_offload_params.wmm_caps;
+				req_offload_params->qos_enabled;
+		roam_offload_params->wmm_caps = req_offload_params->wmm_caps;
 		qdf_mem_copy((uint8_t *)roam_offload_params->mcsset,
-				(uint8_t *)roam_req->roam_offload_params.mcsset,
+				(uint8_t *)req_offload_params->mcsset,
 				ROAM_OFFLOAD_NUM_MCS_SET);
 
 		buf_ptr += sizeof(wmi_roam_offload_tlv_param);
@@ -9086,7 +9088,7 @@ QDF_STATUS send_stats_ext_req_cmd_tlv(wmi_unified_t wmi_handle,
 	QDF_STATUS ret;
 	wmi_req_stats_ext_cmd_fixed_param *cmd;
 	wmi_buf_t buf;
-	uint16_t len;
+	size_t len;
 	uint8_t *buf_ptr;
 
 	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE + preq->request_data_len;
@@ -9387,6 +9389,18 @@ QDF_STATUS send_nan_req_cmd_tlv(wmi_unified_t wmi_handle,
 	nan_data_len = nan_req->request_data_len;
 	nan_data_len_aligned = roundup(nan_req->request_data_len,
 				       sizeof(uint32_t));
+	if (nan_data_len_aligned < nan_req->request_data_len) {
+		WMI_LOGE("%s: integer overflow while rounding up data_len",
+			 __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (nan_data_len_aligned > WMI_SVC_MSG_MAX_SIZE - WMI_TLV_HDR_SIZE) {
+		WMI_LOGE("%s: wmi_max_msg_size overflow for given datalen",
+			 __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	len += WMI_TLV_HDR_SIZE + nan_data_len_aligned;
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
