@@ -75,7 +75,7 @@ static bool hal_is_waiting_irq = false;
 static bool htc_enable_fpc_dbg = false;
 #endif //CONFIG_FPC_HTC_ENABLE_DBG
 
-static const struct vreg_config const vreg_conf[] = {
+static const struct vreg_config vreg_conf[] = {
 };
 
 struct fpc1020_data {
