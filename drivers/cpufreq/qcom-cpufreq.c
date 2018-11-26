@@ -28,11 +28,6 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <trace/events/power.h>
-#include <linux/htc_lmh_debug.h>
-
-#if defined(CONFIG_HTC_DEBUG_FOOTPRINT)
-#include <htc_mnemosyne/htc_footprint.h>
-#endif
 
 static DEFINE_MUTEX(l2bw_lock);
 
@@ -47,6 +42,21 @@ struct cpufreq_suspend_t {
 };
 
 static DEFINE_PER_CPU(struct cpufreq_suspend_t, suspend_data);
+#define LITTLE_CPU_QOS_FREQ 1900800
+#define BIG_CPU_QOS_FREQ    2361600
+
+unsigned int cluster1_first_cpu;
+static bool qos_cpufreq_flag;
+static void c0_cpufreq_limit(struct work_struct *work);
+static void c1_cpufreq_limit(struct work_struct *work);
+static struct workqueue_struct *qos_cpufreq_work_queue;
+static DECLARE_WORK(c0_cpufreq_limit_work, c0_cpufreq_limit);
+static DECLARE_WORK(c1_cpufreq_limit_work, c1_cpufreq_limit);
+struct qos_request_value {
+	bool flag;
+	unsigned int max_cpufreq;
+	unsigned int min_cpufreq;
+};
 
 static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 			unsigned int index)
@@ -62,23 +72,9 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	cpufreq_freq_transition_begin(policy, &freqs);
 
 	rate = new_freq * 1000;
-#if defined(CONFIG_HTC_DEBUG_FOOTPRINT)
-	set_acpuclk_footprint_by_clk(cpu_clk[policy->cpu], ACPU_ENTER);
-	set_acpuclk_cpu_freq_footprint_by_clk(FT_PREV_RATE, cpu_clk[policy->cpu], policy->cur * 1000);
-	set_acpuclk_cpu_freq_footprint_by_clk(FT_NEW_RATE, cpu_clk[policy->cpu], rate);
-#endif
-
 	rate = clk_round_rate(cpu_clk[policy->cpu], rate);
 	ret = clk_set_rate(cpu_clk[policy->cpu], rate);
-#if defined(CONFIG_HTC_DEBUG_FOOTPRINT)
-	set_acpuclk_footprint_by_clk(cpu_clk[policy->cpu], ACPU_BEFORE_UPDATE_L2_BW);
-#endif
-
 	cpufreq_freq_transition_end(policy, &freqs, ret);
-
-#if defined(CONFIG_HTC_DEBUG_FOOTPRINT)
-	set_acpuclk_footprint_by_clk(cpu_clk[policy->cpu], ACPU_LEAVE);
-#endif
 
 	return ret;
 }
@@ -140,7 +136,6 @@ static unsigned int msm_cpufreq_get_freq(unsigned int cpu)
 	return clk_get_rate(cpu_clk[cpu]) / 1000;
 }
 
-struct cpu_freq_table cpu_freq_table_info;
 static int msm_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int cur_freq;
@@ -148,8 +143,7 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 	int ret = 0;
 	struct cpufreq_frequency_table *table =
 			per_cpu(freq_table, policy->cpu);
-	struct cpufreq_frequency_table *pos;
-	int cpu, freq_steps_num = 0;
+	int cpu;
 
 	/*
 	 * In some SoC, some cores are clocked by same source, and their
@@ -157,18 +151,6 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 	 * CPUs that share same clock, and mark them as controlled by
 	 * same policy.
 	 */
-	cpufreq_for_each_valid_entry(pos, table) {
-		cpu_freq_table_info.cpu_freq_table[policy->cpu][freq_steps_num] = pos->frequency;
-		freq_steps_num++;
-	}
-	cpu_freq_table_info.cpu_freq_steps_num[policy->cpu] = freq_steps_num;
-	cpu_freq_table_info.max_cpu_freq[policy->cpu] = cpu_freq_table_info.cpu_freq_table[policy->cpu][freq_steps_num-1];
-	pr_info("%s: CPU%d: cpufreq steps number:%d, Max cpufreq:%d\n",
-					__func__,
-					policy->cpu,
-					cpu_freq_table_info.cpu_freq_steps_num[policy->cpu],
-					cpu_freq_table_info.max_cpu_freq[policy->cpu]);
-
 	for_each_possible_cpu(cpu)
 		if (cpu_clk[cpu] == cpu_clk[policy->cpu])
 			cpumask_set_cpu(cpu, policy->cpus);
@@ -233,29 +215,17 @@ static int msm_cpufreq_cpu_callback(struct notifier_block *nfb,
 		clk_unprepare(l2_clk);
 		break;
 	case CPU_UP_PREPARE:
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-		set_hotplug_on_footprint(cpu, HOF_ENTER);
-#endif
 		rc = clk_prepare(l2_clk);
 		if (rc < 0)
 			return NOTIFY_BAD;
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-		set_hotplug_on_footprint(cpu, HOF_AFTER_PREPARE_ENABLE_L2);
-#endif
 		rc = clk_prepare(cpu_clk[cpu]);
 		if (rc < 0) {
 			clk_unprepare(l2_clk);
 			return NOTIFY_BAD;
 		}
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-		set_hotplug_on_footprint(cpu, HOF_AFTER_PREPARE_ENABLE_CPU);
-#endif
 		break;
 
 	case CPU_STARTING:
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-		set_hotplug_on_footprint(cpu, HOF_BEFORE_UPDATE_L2_BW);
-#endif
 		rc = clk_enable(l2_clk);
 		if (rc < 0)
 			return NOTIFY_BAD;
@@ -264,9 +234,6 @@ static int msm_cpufreq_cpu_callback(struct notifier_block *nfb,
 			clk_disable(l2_clk);
 			return NOTIFY_BAD;
 		}
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-		set_hotplug_on_footprint(cpu, HOF_LEAVE);
-#endif
 		break;
 
 	default:
@@ -508,6 +475,48 @@ static struct platform_driver msm_cpufreq_plat_driver = {
 	},
 };
 
+static void c0_cpufreq_limit(struct work_struct *work)
+{
+	struct cpufreq_policy *policy;
+
+	policy = cpufreq_cpu_get(0);
+	if (policy)  {
+		qos_cpufreq_flag = true;
+		cpufreq_driver_target(policy,
+			LITTLE_CPU_QOS_FREQ, CPUFREQ_RELATION_H);
+		cpufreq_cpu_put(policy);
+	}
+	//sched_set_boost(1);
+}
+
+void c0_cpufreq_limit_queue(void)
+{
+	if (qos_cpufreq_work_queue)
+		queue_work(qos_cpufreq_work_queue, &c0_cpufreq_limit_work);
+}
+EXPORT_SYMBOL_GPL(c0_cpufreq_limit_queue);
+
+static void c1_cpufreq_limit(struct work_struct *work)
+{
+	struct cpufreq_policy *policy;
+
+	policy = cpufreq_cpu_get(cluster1_first_cpu);
+	if (policy)  {
+		qos_cpufreq_flag = true;
+		cpufreq_driver_target(policy,
+			BIG_CPU_QOS_FREQ, CPUFREQ_RELATION_H);
+		cpufreq_cpu_put(policy);
+	}
+
+}
+
+void c1_cpufreq_limit_queue(void)
+{
+	if (qos_cpufreq_work_queue)
+		queue_work(qos_cpufreq_work_queue, &c1_cpufreq_limit_work);
+}
+EXPORT_SYMBOL_GPL(c1_cpufreq_limit_queue);
+
 static int __init msm_cpufreq_register(void)
 {
 	int cpu, rc;
@@ -531,22 +540,6 @@ static int __init msm_cpufreq_register(void)
 	register_pm_notifier(&msm_cpufreq_pm_notifier);
 	return cpufreq_register_driver(&msm_cpufreq_driver);
 }
-
-int is_sync_cpu(struct cpumask *mask, int first_cpu)
-{
-	int cpu;
-
-	for_each_cpu_and(cpu, mask, cpu_possible_mask) {
-		if (cpu == first_cpu)
-			continue;
-		if (cpu_clk[cpu] != cpu_clk[first_cpu])
-			return 0;
-	}
-
-	return 1;
-}
-
-EXPORT_SYMBOL(is_sync_cpu);
 
 subsys_initcall(msm_cpufreq_register);
 
