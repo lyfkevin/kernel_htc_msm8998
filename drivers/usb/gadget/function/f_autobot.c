@@ -1575,7 +1575,7 @@ static ssize_t autobot_debug_mode_store(struct config_item *item,
 		if (!test_frame)
 			test_frame = kzalloc(framesize * 2, GFP_KERNEL);
 
-		if (test_frame)
+		if (test_frame) {
 			for (i = 0 ; i < framesize ; i++)
 				if (i < framesize/4)
 					test_frame[i] = 0xF800;
@@ -1584,7 +1584,7 @@ static ssize_t autobot_debug_mode_store(struct config_item *item,
 				else if (i < framesize*3/4)
 					test_frame[i] = 0x1F;
 				else
-					test_frame[i] = 0xFFFF;
+					test_frame[i] = 0xFFFF;}
 
 		config->debug_mode = value;
 		return len;
