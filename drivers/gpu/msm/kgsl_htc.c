@@ -28,7 +28,7 @@ static int ctx_dump_set(void* data, u64 val)
 	struct kgsl_device *device = data;
 
 	read_lock(&device->context_lock);
-	kgsl_dump_contextpid_locked(&device->context_idr);
+	//kgsl_dump_contextpid_locked(&device->context_idr);
 	read_unlock(&device->context_lock);
 	return 0;
 }
@@ -109,6 +109,7 @@ int kgsl_device_htc_init(struct kgsl_device *device)
 /* Dump pid informations of all contexts
  * caller need to hold context_lock
  */
+/*
 void kgsl_dump_contextpid_locked(struct idr *context_idr)
 {
 	int i = 0;
@@ -145,6 +146,7 @@ void kgsl_dump_contextpid_locked(struct idr *context_idr)
 		}
 	}
 }
+*/
 
 /* enter panic/kill process when GPU fault happened */
 void adreno_fault_panic(struct kgsl_device *device, unsigned int pid, int fault) {

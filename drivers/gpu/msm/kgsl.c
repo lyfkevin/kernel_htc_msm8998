@@ -399,7 +399,7 @@ static int kgsl_mem_entry_attach_process(struct kgsl_device *device,
 	if (ret) {
 		kgsl_process_private_put(process);
 		spin_lock(&process->mem_lock);
-		kgsl_dump_contextpid_locked(&device->context_idr);
+		//kgsl_dump_contextpid_locked(&device->context_idr);
 		spin_unlock(&process->mem_lock);
 		return ret;
 	}
