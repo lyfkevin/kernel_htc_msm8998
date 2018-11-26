@@ -1403,12 +1403,6 @@ int ion_share_dma_buf_fd(struct ion_client *client, struct ion_handle *handle)
 }
 EXPORT_SYMBOL(ion_share_dma_buf_fd);
 
-static int ion_share_dma_buf_fd_nolock(struct ion_client *client,
-				       struct ion_handle *handle)
-{
-	return __ion_share_dma_buf_fd(client, handle, false);
-}
-
 bool ion_dma_buf_is_secure(struct dma_buf *dmabuf)
 {
 	struct ion_buffer *buffer;
@@ -1430,6 +1424,12 @@ bool ion_dma_buf_is_secure(struct dma_buf *dmabuf)
 		true : false;
 }
 EXPORT_SYMBOL(ion_dma_buf_is_secure);
+
+static int ion_share_dma_buf_fd_nolock(struct ion_client *client,
+				       struct ion_handle *handle)
+{
+	return __ion_share_dma_buf_fd(client, handle, false);
+}
 
 struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 {
@@ -1687,15 +1687,10 @@ static const struct file_operations ion_fops = {
 	.compat_ioctl   = compat_ion_ioctl,
 };
 
-struct ion_heap_total {
-	size_t vss;
-	size_t pss;
-};
-
-static struct ion_heap_total ion_debug_heap_total(struct ion_client *client,
+static size_t ion_debug_heap_total(struct ion_client *client,
 				   unsigned int id)
 {
-	struct ion_heap_total total = {.vss = 0, .pss = 0};
+	size_t size = 0;
 	struct rb_node *n;
 
 	mutex_lock(&client->lock);
@@ -1703,15 +1698,11 @@ static struct ion_heap_total ion_debug_heap_total(struct ion_client *client,
 		struct ion_handle *handle = rb_entry(n,
 						     struct ion_handle,
 						     node);
-		if (handle->buffer->heap->id == id) {
-			int handle_count = handle->buffer->handle_count;
-			if (handle_count)
-				total.pss += handle->buffer->size / handle_count;
-			total.vss += handle->buffer->size;
-		}
+		if (handle->buffer->heap->id == id)
+			size += handle->buffer->size;
 	}
 	mutex_unlock(&client->lock);
-	return total;
+	return size;
 }
 
 /**
@@ -1822,26 +1813,26 @@ static int ion_debug_heap_show(struct seq_file *s, void *unused)
 	size_t total_size = 0;
 	size_t total_orphaned_size = 0;
 
-	seq_printf(s, "%16s %16s %16s %16s\n", "client", "pid", "size(PSS)", "size(VSS)");
+	seq_printf(s, "%16s %16s %16s\n", "client", "pid", "size");
 	seq_puts(s, "----------------------------------------------------\n");
 
 	mutex_lock(&debugfs_mutex);
 	for (n = rb_first(&dev->clients); n; n = rb_next(n)) {
 		struct ion_client *client = rb_entry(n, struct ion_client,
 						     node);
-		struct ion_heap_total total = ion_debug_heap_total(client, heap->id);
+		size_t size = ion_debug_heap_total(client, heap->id);
 
-		if (!total.vss)
+		if (!size)
 			continue;
 		if (client->task) {
 			char task_comm[TASK_COMM_LEN];
 
 			get_task_comm(task_comm, client->task);
-			seq_printf(s, "%16s %16u %16zu %16zu\n", task_comm,
-				   client->pid, total.pss, total.vss);
+			seq_printf(s, "%16s %16u %16zu\n", task_comm,
+				   client->pid, size);
 		} else {
-			seq_printf(s, "%16s %16u %16zu %16zu\n", client->name,
-				   client->pid, total.pss, total.vss);
+			seq_printf(s, "%16s %16u %16zu\n", client->name,
+				   client->pid, size);
 		}
 	}
 	mutex_unlock(&debugfs_mutex);
