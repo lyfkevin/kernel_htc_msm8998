@@ -11,6 +11,8 @@ extern unsigned long last_input_time;
 void cpu_input_boost_kick(void);
 void cpu_general_boost_kick(unsigned int duration_ms);
 void cpu_input_boost_kick_max(unsigned int duration_ms);
+void cpu_input_boost_kick_gpu(void);
+void unboost_kick_gpu(void);
 #else
 static inline void cpu_input_boost_kick(void)
 {
@@ -19,6 +21,12 @@ static inline void cpu_general_boost_kick(unsigned int duration_ms)
 {
 }
 static inline void cpu_input_boost_kick_max(unsigned int duration_ms)
+{
+}
+void cpu_input_boost_kick_gpu(void)
+{
+}
+void unboost_kick_gpu(void)
 {
 }
 #endif

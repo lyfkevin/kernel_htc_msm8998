@@ -44,6 +44,7 @@ module_param(remove_input_boost_freq_perf, uint, 0644);
 #define GENERAL_BOOST		BIT(2)
 #define WAKE_BOOST		BIT(3)
 #define MAX_BOOST		BIT(4)
+#define GPU_BOOST		BIT(5)
 
 struct boost_drv {
 	struct workqueue_struct *wq;
@@ -53,6 +54,8 @@ struct boost_drv {
 	struct delayed_work general_unboost;
 	struct work_struct max_boost;
 	struct delayed_work max_unboost;
+	struct work_struct gpu_boost;
+	struct work_struct gpu_unboost;
 	struct notifier_block cpu_notif;
 	struct notifier_block fb_notif;
 	atomic64_t max_boost_expires;
@@ -119,7 +122,7 @@ static void unboost_all_cpus(struct boost_drv *b)
 		!cancel_delayed_work_sync(&b->max_unboost))
 		return;
 
-	clear_boost_bit(b, INPUT_BOOST | GENERAL_BOOST | WAKE_BOOST | MAX_BOOST);
+	clear_boost_bit(b, INPUT_BOOST | GENERAL_BOOST | WAKE_BOOST | MAX_BOOST | GPU_BOOST);
 	update_online_cpu_policy();
 }
 
@@ -199,6 +202,26 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 		return;
 
 	__cpu_input_boost_kick_max(b, duration_ms);
+}
+
+void cpu_input_boost_kick_gpu(void)
+{
+	struct boost_drv *b = boost_drv_g;
+
+	if (!b)
+		return;
+
+	queue_work(b->wq, &b->gpu_boost);
+}
+
+void unboost_kick_gpu(void)
+{
+	struct boost_drv *b = boost_drv_g;
+
+	if (!b)
+		return;
+
+	queue_work(b->wq, &b->gpu_unboost);
 }
 
 static void input_boost_worker(struct work_struct *work)
@@ -287,6 +310,22 @@ static void max_unboost_worker(struct work_struct *work)
 	update_online_cpu_policy();
 }
 
+static void gpu_boost_worker(struct work_struct *work)
+{
+	struct boost_drv *b = container_of(work, typeof(*b), gpu_boost);
+
+	set_boost_bit(b, GPU_BOOST);
+	update_online_cpu_policy();
+}
+
+static void gpu_unboost_worker(struct work_struct *work)
+{
+	struct boost_drv *b = container_of(work, typeof(*b), gpu_unboost);
+
+	clear_boost_bit(b, GPU_BOOST);
+	update_online_cpu_policy();
+}
+
 static int cpu_notifier_cb(struct notifier_block *nb,
 			   unsigned long action, void *data)
 {
@@ -309,7 +348,7 @@ static int cpu_notifier_cb(struct notifier_block *nb,
 	 * Boost to policy->max if the boost frequency is higher. When
 	 * unboosting, set policy->min to the absolute min freq for the CPU.
 	 */
-	if (state & INPUT_BOOST || state & GENERAL_BOOST) {
+	if (state & INPUT_BOOST || state & GENERAL_BOOST || state & GPU_BOOST) {
 		boost_freq = get_boost_freq(b, policy->cpu, state);
 		policy->min = min(policy->max, boost_freq);
 	} else {
@@ -461,6 +500,8 @@ static int __init cpu_input_boost_init(void)
 	INIT_DELAYED_WORK(&b->general_unboost, general_unboost_worker);
 	INIT_WORK(&b->max_boost, max_boost_worker);
 	INIT_DELAYED_WORK(&b->max_unboost, max_unboost_worker);
+	INIT_WORK(&b->gpu_boost, gpu_boost_worker);
+	INIT_WORK(&b->gpu_unboost, gpu_unboost_worker);
 	atomic_set(&b->state, 0);
 
 	b->cpu_notif.notifier_call = cpu_notifier_cb;
