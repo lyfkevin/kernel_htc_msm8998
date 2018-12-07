@@ -19,6 +19,8 @@ struct boost_dev {
 	struct delayed_work input_unboost;
 	struct work_struct max_boost;
 	struct delayed_work max_unboost;
+	struct work_struct input_boost_gpu;
+	struct work_struct input_unboost_gpu;
 	unsigned long abs_min_freq;
 	unsigned long boost_freq;
 	unsigned long max_boost_expires;
@@ -30,6 +32,8 @@ struct boost_dev {
 #ifdef CONFIG_DEVFREQ_BOOST
 void devfreq_boost_kick(enum df_device device);
 void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms);
+void devfreq_boost_kick_gpu(enum df_device device);
+void devfreq_unboost_gpu(enum df_device device);
 void devfreq_register_boost_device(enum df_device device, struct devfreq *df);
 struct boost_dev *devfreq_get_boost_dev(enum df_device device);
 #else
@@ -39,6 +43,14 @@ void devfreq_boost_kick(enum df_device device)
 }
 static inline
 void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
+{
+}
+static inline
+void devfreq_boost_kick_gpu(enum df_device device)
+{
+}
+static inline
+void devfreq_unboost_gpu(enum df_device device)
 {
 }
 static inline
