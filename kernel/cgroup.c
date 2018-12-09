@@ -61,6 +61,7 @@
 #include <linux/atomic.h>
 #include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
+#include <linux/state_notifier.h>
 
 /*
  * pidlists linger the following amount before being destroyed.  The goal
@@ -2777,7 +2778,7 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
 
 	/* Boost CPU to the max for 250 ms when any app becomes a top app */
-	if (!ret && !memcmp(cgrp->kn->name, "top-app", sizeof("top-app"))) {
+	if (!ret && !state_suspended && !memcmp(cgrp->kn->name, "top-app", sizeof("top-app"))) {
 		cpu_input_boost_kick_max(250);
 		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 250);
 	}
