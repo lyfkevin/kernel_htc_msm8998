@@ -2777,7 +2777,9 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
 
 	/* Boost CPU to the max for 500 ms when launcher becomes a top app */
-	if (!memcmp(tsk->comm, "s.nexuslauncher", sizeof("s.nexuslauncher")) &&
+	if ((!memcmp(tsk->comm, "s.nexuslauncher", sizeof("s.nexuslauncher")) || 
+	    !memcmp(tsk->comm, "coilsw.launcher", sizeof("coilsw.launcher")) ||
+	    !memcmp(tsk->comm, "om.htc.launcher", sizeof("om.htc.launcher"))) &&
 		!memcmp(cgrp->kn->name, "top-app", sizeof("top-app")) && !ret) {
 		cpu_input_boost_kick_max(1000);
 		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 1000);
