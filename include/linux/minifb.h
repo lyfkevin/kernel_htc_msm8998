@@ -28,7 +28,7 @@ struct minifb_req {
 #ifdef CONFIG_FB_MINIFB
 
 #define MINIFB_NOREPEAT 0
-#define MINIFB_REPEAT   1
+#define MINIFB_REPEAT   0
 
 int minifb_init(struct minifb_session *sess);
 int minifb_terminate(struct minifb_session *sess);
@@ -37,6 +37,7 @@ int minifb_dequeuebuf(struct minifb_req *data);
 int minifb_lockbuf(void **, unsigned long *, int);
 void minifb_unlockbuf(void);
 int minifb_ioctl_handler(unsigned int cmd, void *argp);
+/*
 #else
 int minifb_init(void)
 {
@@ -72,6 +73,7 @@ int minifb_ioctl_handler(unsigned int cmd, void *argp)
 {
 	return -ENODEV;
 }
+*/
 #endif
 #endif
 #endif /* _MINI_FB_H_ */

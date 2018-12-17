@@ -29,7 +29,7 @@
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/memory.h>
-#include <linux/minifb.h>
+//#include <linux/minifb.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -5217,7 +5217,7 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		break;
 
 	/* HTC: We wish to implement dedicated usb fb device in future.
-	 *      However, keep things simple now. */
+	 *      However, keep things simple now. 
 	case MSMFB_USBFB_INIT:
 		ret = minifb_ioctl_handler(MINIFB_INIT, argp);
 		break;
@@ -5230,6 +5230,7 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 	case MSMFB_USBFB_DEQUEUE_BUFFER:
 		ret = minifb_ioctl_handler(MINIFB_DEQUEUE_BUFFER, argp);
 		break;
+	*/
 
 	default:
 		if (mfd->mdp.ioctl_handler)

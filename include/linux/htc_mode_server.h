@@ -20,7 +20,7 @@
 
 #define HSML_VERSION_12             1
 
-#define MINIFB_READY				1
+#define MINIFB_READY				0
 #define BATTERY_READY				0
 
 #define HSML_PROTOCOL_VERSION		0x0006

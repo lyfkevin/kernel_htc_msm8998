@@ -284,23 +284,29 @@ static void send_fb(struct autobot_dev *dev)
 	int xfer;
 	int count = dev->framesize;
 	char *frame = NULL;
+/*
 #if MINIFB_READY
 	unsigned long frameSize = 0;
 #endif
+*/
 	int last_pkt = 0;
 
 	if (dev->htcmode_proto->debug_mode) {
 		frame = (char *)test_frame;
 	} else {
+/*
 #if MINIFB_READY
 		if (minifb_lockbuf((void**)&frame, &frameSize, MINIFB_REPEAT) < 0) {
 			pr_warn("no frame\n");
 			return;
 		}
 #else
+*/
 		pr_warn("no frame\n");
 		return;
+/*
 #endif
+*/
 	}
 
 	if (frame == NULL) {
