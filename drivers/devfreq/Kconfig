@@ -64,6 +64,12 @@ config DEVFREQ_GOV_USERSPACE
 	  Otherwise, the governor does not change the frequnecy
 	  given at the initialization.
 
+config SIMPLE_GPU_ALGORITHM
+	bool "Simple GPU algorithm"
+	depends on DEVFREQ_GOV_QCOM_ADRENO_TZ
+	help
+	  Simple user configurable GPU controlling algorithm
+
 config DEVFREQ_GOV_QCOM_ADRENO_TZ
 	tristate "Qualcom  Adreno Trustzone"
 	depends on QCOM_KGSL && QCOM_SCM
