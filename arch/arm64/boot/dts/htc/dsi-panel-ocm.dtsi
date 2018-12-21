@@ -270,7 +270,7 @@
 		qcom,mdss-dsi-te-check-enable;
 		qcom,mdss-dsi-te-using-te-pin;
 		qcom,mdss-tear-check-sync-cfg-height = <0x3ff0>;
-		qcom,esd-check-enabled;
+
 		qcom,mdss-dsi-panel-status-check-mode = "te_signal_check_v2";
 		/* XXX: Don't care */
 		qcom,mdss-dsi-panel-status-command = [06 01 00 01 05 00 02 0A 00];
@@ -476,8 +476,8 @@
 		qcom,mdss-dsi-panel-name = "WQHD JDI TD4353 5.99 command mode panel";
 		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
 		qcom,mdss-dsi-panel-framerate = <60>;
-		qcom,mdss-dsi-panel-clockrate = <862000000>;
-		qcom,mdss-mdp-transfer-time-us = <14500>;
+		qcom,mdss-dsi-panel-clockrate = <899000000>;
+		qcom,mdss-mdp-transfer-time-us = <13400>;
 		qcom,mdss-dsi-virtual-channel-id = <0>;
 		qcom,mdss-dsi-stream = <0>;
 		qcom,mdss-dsi-panel-width = <720>;
@@ -536,6 +536,10 @@
 		qcom,mdss-dsi-te-using-te-pin;
 		qcom,mdss-tear-check-sync-cfg-height = <0x3ff0>;
 		qcom,dcs-cmd-by-left;
+
+		qcom,ulps-enabled;
+		qcom,partial-update-enabled;
+
 		qcom,mdss-dsi-on-command = [
 			39 01 00 00 00 00 05 2A 00 00 05 9F /* soft reset */
 			39 01 00 00 00 00 05 2B 00 00 0B 3F /* soft reset */
@@ -599,9 +603,9 @@
 			qcom,supply-enable-load = <62000>;
 			qcom,supply-disable-load = <80>;
 			qcom,supply-pre-on-sleep = <0>;
-			qcom,supply-post-on-sleep = <12>;
+			qcom,supply-post-on-sleep = <5>;
 			qcom,supply-pre-off-sleep = <0>;
-			qcom,supply-post-off-sleep = <12>;
+			qcom,supply-post-off-sleep = <5>;
 		};
 		qcom,panel-supply-entry@1 {
 			reg = <1>;
@@ -611,9 +615,9 @@
 			qcom,supply-enable-load = <62000>;
 			qcom,supply-disable-load = <80>;
 			qcom,supply-pre-on-sleep = <0>;
-			qcom,supply-post-on-sleep = <12>;
-			qcom,supply-pre-off-sleep = <5>;
-			qcom,supply-post-off-sleep = <12>;
+			qcom,supply-post-on-sleep = <5>;
+			qcom,supply-pre-off-sleep = <0>;
+			qcom,supply-post-off-sleep = <5>;
 		};
 	};
 
