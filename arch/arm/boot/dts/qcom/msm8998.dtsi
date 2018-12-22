@@ -716,9 +716,9 @@
 		qcom,cpulist = <&CPU0 &CPU1 &CPU2 &CPU3>;
 		qcom,target-dev = <&mincpubw>;
 		qcom,core-dev-table =
-                        <  300000 1525 >,	
-                        <  499200 3143 >,	
-                        < 1113600 4173 >,	
+                        <  300000 1525 >,
+                        <  499200 3143 >,
+                        < 1113600 4173 >,
                         < 1881600 5859 >;
 	};
 
@@ -3102,9 +3102,9 @@
 	qcom,msm-core@780000 {
 		compatible = "qcom,apss-core-ea";
 		reg = <0x780000 0x1000>;
-		qcom,low-hyst-temp = <100>;
-		qcom,high-hyst-temp = <100>;
-		qcom,polling-interval = <50>;
+		qcom,low-hyst-temp = <10>;
+		qcom,high-hyst-temp = <5>;
+		qcom,polling-interval = <100>;
 
 		ea0: ea0 {
 			sensor = <&sensor_information1>;
