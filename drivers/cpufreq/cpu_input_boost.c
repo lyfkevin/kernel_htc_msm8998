@@ -30,13 +30,17 @@ module_param(input_boost_duration, short, 0644);
 module_param(remove_input_boost_freq_lp, uint, 0644);
 module_param(remove_input_boost_freq_perf, uint, 0644);
 
-
 /* Available bits for boost_drv state */
 #define SCREEN_AWAKE		BIT(0)
 #define INPUT_BOOST		BIT(1)
 #define GENERAL_BOOST		BIT(2)
 #define WAKE_BOOST		BIT(3)
 #define MAX_BOOST		BIT(4)
+
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+static int dynamic_stune_boost;
+module_param(dynamic_stune_boost, uint, 0644);
+#endif /* CONFIG_DYNAMIC_STUNE_BOOST */
 
 struct boost_drv {
 	struct workqueue_struct *wq;
@@ -203,6 +207,11 @@ static void input_boost_worker(struct work_struct *work)
 		update_online_cpu_policy();
 	}
 
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	/* Set dynamic stune boost value */
+	do_stune_boost("top-app", dynamic_stune_boost);
+#endif /* CONFIG_DYNAMIC_STUNE_BOOST */
+
 	queue_delayed_work(b->wq, &b->input_unboost,
 		msecs_to_jiffies(input_boost_duration));
 }
@@ -226,6 +235,12 @@ static void input_unboost_worker(struct work_struct *work)
 		container_of(to_delayed_work(work), typeof(*b), input_unboost);
 
 	clear_boost_bit(b, INPUT_BOOST);
+
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	/* Reset dynamic stune boost value to the default value */
+	reset_stune_boost("top-app");
+#endif /* CONFIG_DYNAMIC_STUNE_BOOST */
+
 	update_online_cpu_policy();
 }
 
@@ -367,6 +382,11 @@ free_handle:
 
 static void cpu_input_boost_input_disconnect(struct input_handle *handle)
 {
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	/* Reset dynamic stune boost value to the default value */
+	reset_stune_boost("top-app");
+#endif
+
 	input_close_device(handle);
 	input_unregister_handle(handle);
 	kfree(handle);
