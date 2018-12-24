@@ -516,7 +516,7 @@ static unsigned int uksm_sleep_saved;
 /* Max percentage of cpu utilization ksmd can take to scan in one batch */
 static unsigned int uksm_max_cpu_percentage;
 
-static int uksm_cpu_governor;
+static int uksm_cpu_governor = 1;
 
 static char *uksm_cpu_governor_str[4] = { "full", "medium", "low", "quiet" };
 
@@ -527,10 +527,10 @@ struct uksm_cpu_preset_s {
 };
 
 struct uksm_cpu_preset_s uksm_cpu_preset[4] = {
-	{ {20, 40, -2500, -10000}, {1000, 500, 200, 50}, 95},
-	{ {20, 30, -2500, -10000}, {1000, 500, 400, 100}, 50},
-	{ {10, 20, -5000, -10000}, {1500, 1000, 1000, 250}, 20},
-	{ {10, 20, 40, 75}, {2000, 1000, 1000, 1000}, 1},
+	{ {-5000, -7500, -9000, -10000}, {90000, 500, 200, 100}, 18},
+	{ {-5000, -6000, -7500, -10000}, {120000, 1000, 500, 250}, 12},
+	{ {-5000, -6000, -7500, -10000}, {180000, 2500, 1000, 500}, 7},
+	{ {-2500, -3500, -5000, -10000}, {300000, 4000, 2500, 1500}, 1},
 };
 
 /* The default value for uksm_ema_page_time if it's not initialized */
@@ -4195,7 +4195,7 @@ out:
 }
 
 
-#define SPIN_LOCK_PERIOD	32
+#define SPIN_LOCK_PERIOD	64
 static struct vma_slot *cleanup_slots[SPIN_LOCK_PERIOD];
 static inline void cleanup_vma_slots(void)
 {
@@ -4432,8 +4432,8 @@ static inline int hash_round_finished(void)
 	}
 }
 
-#define UKSM_MMSEM_BATCH	5
-#define BUSY_RETRY		100
+#define UKSM_MMSEM_BATCH	8
+#define BUSY_RETRY		64
 
 /**
  * uksm_do_scan()  - the main worker function.
@@ -4844,10 +4844,10 @@ static ssize_t max_cpu_percentage_store(struct kobject *kobj,
 	if (err || max_cpu_percentage > 100)
 		return -EINVAL;
 
-	if (max_cpu_percentage == 100)
-		max_cpu_percentage = 99;
-	else if (max_cpu_percentage < 10)
-		max_cpu_percentage = 10;
+	if (max_cpu_percentage > 75)
+		max_cpu_percentage = 75;
+	else if (!max_cpu_percentage)
+		max_cpu_percentage = 1;
 
 	uksm_max_cpu_percentage = max_cpu_percentage;
 
@@ -5166,7 +5166,7 @@ UKSM_ATTR(eval_intervals);
 static ssize_t ema_per_page_time_show(struct kobject *kobj,
 				 struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%lu\n", uksm_ema_page_time);
+	return sprintf(buf, "%lu\n", 1000000 / uksm_ema_task_pages);
 }
 UKSM_ATTR_RO(ema_per_page_time);
 
@@ -5499,7 +5499,7 @@ static int __init uksm_init(void)
 	struct task_struct *uksm_thread;
 	int err;
 
-	uksm_sleep_jiffies = msecs_to_jiffies(100);
+	uksm_sleep_jiffies = msecs_to_jiffies(500);
 	uksm_sleep_saved = uksm_sleep_jiffies;
 
 	slot_tree_init();
