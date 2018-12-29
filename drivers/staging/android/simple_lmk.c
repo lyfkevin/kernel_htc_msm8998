@@ -16,12 +16,19 @@
 /* Duration to boost CPU and DDR bus to the max per memory reclaim event */
 #define BOOST_DURATION_MS (250)
 
-#define MIN_FREE_PAGES (CONFIG_ANDROID_SIMPLE_LMK_MINFREE * SZ_1M / PAGE_SIZE)
+static unsigned short slmk_minfree = CONFIG_ANDROID_SIMPLE_LMK_MINFREE;
+static unsigned short slmk_kswapd_timeout = CONFIG_ANDROID_SIMPLE_LMK_KSWAPD_TIMEOUT;
+static unsigned short slmk_oom_timeout = CONFIG_ANDROID_SIMPLE_LMK_OOM_TIMEOUT;
+module_param(slmk_minfree, short, 0644);
+module_param(slmk_kswapd_timeout, short, 0644);
+module_param(slmk_oom_timeout, short, 0644);
+
+#define MIN_FREE_PAGES (slmk_minfree * SZ_1M / PAGE_SIZE)
 
 #define KSWAPD_LMK_EXPIRES \
-	msecs_to_jiffies(CONFIG_ANDROID_SIMPLE_LMK_KSWAPD_TIMEOUT)
+	msecs_to_jiffies(slmk_kswapd_timeout)
 #define OOM_LMK_EXPIRES \
-	msecs_to_jiffies(CONFIG_ANDROID_SIMPLE_LMK_OOM_TIMEOUT)
+	msecs_to_jiffies(slmk_oom_timeout)
 
 /* Pulled from the Android framework */
 static const short int adj_prio[] = {
