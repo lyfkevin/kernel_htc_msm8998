@@ -227,7 +227,12 @@ struct page {
 
 	DECLARE_PAGE_USER_TRACE(trace_alloc);
 	DECLARE_PAGE_USER_TRACE(trace_free);
+
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	bool reserved_for_lmk;
+#endif
 }
+
 /*
  * The struct page can be forced to be double word aligned so that atomic ops
  * on double words work. The SLUB allocator can make use of such a feature.
