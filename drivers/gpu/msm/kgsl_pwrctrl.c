@@ -741,20 +741,25 @@ static void kgsl_pwrctrl_max_clock_set(struct kgsl_device *device, int val)
 		}
 		if (i == pwr->num_pwrlevels - 1)
 			goto err;
-		hfreq = pwr->pwrlevels[i].gpu_freq;
-		diff =  hfreq - pwr->pwrlevels[i + 1].gpu_freq;
-		udiff = hfreq - val;
-		pwr->thermal_timeout = (udiff * msecs_to_jiffies(TH_HZ)) / diff;
-		pwr->thermal_cycle = CYCLE_ENABLE;
-	} else {
+
+		if (kgsl_pwrctrl_limit_enable) {
+			hfreq = pwr->pwrlevels[i].gpu_freq;
+			diff =  hfreq - pwr->pwrlevels[i + 1].gpu_freq;
+			udiff = hfreq - val;
+
+			pwr->thermal_timeout = (udiff * msecs_to_jiffies(TH_HZ)) / diff;
+			pwr->thermal_cycle = CYCLE_ENABLE;
+		}
+	} else if (kgsl_pwrctrl_limit_enable) {
 		pwr->thermal_cycle = CYCLE_DISABLE;
 		del_timer_sync(&pwr->thermal_timer);
 	}
 	mutex_unlock(&device->mutex);
 
-	if (pwr->sysfs_pwr_limit)
+	if (kgsl_pwrctrl_limit_enable && pwr->sysfs_pwr_limit)
 		kgsl_pwr_limits_set_freq(pwr->sysfs_pwr_limit,
 					pwr->pwrlevels[level].gpu_freq);
+
 	return;
 
 err:
