@@ -119,7 +119,7 @@ __rb_insert(struct rb_node *node, struct rb_root *root,
 		if (parent != tmp) {	/* parent == gparent->rb_left */
 			if (tmp && rb_is_red(tmp)) {
 				/*
-				 * Case 1 - node's uncle is red (color flips).
+				 * Case 1 - color flips
 				 *
 				 *       G            g
 				 *      / \          / \
@@ -142,8 +142,7 @@ __rb_insert(struct rb_node *node, struct rb_root *root,
 			tmp = parent->rb_right;
 			if (node == tmp) {
 				/*
-				 * Case 2 - node's uncle is black and node is
-				 * the parent's right child (left rotate at parent).
+				 * Case 2 - left rotate at parent
 				 *
 				 *      G             G
 				 *     / \           / \
@@ -167,8 +166,7 @@ __rb_insert(struct rb_node *node, struct rb_root *root,
 			}
 
 			/*
-			 * Case 3 - node's uncle is black and node is
-			 * the parent's left child (right rotate at gparent).
+			 * Case 3 - right rotate at gparent
 			 *
 			 *        G           P
 			 *       / \         / \
