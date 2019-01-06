@@ -53,8 +53,6 @@
 #include <linux/fb.h>
 #endif
 
-#include <linux/pm_qos.h>
-
 #define INPUT_PHYS_NAME "synaptics_dsx/touch_input"
 #define STYLUS_PHYS_NAME "synaptics_dsx/stylus"
 
@@ -3002,9 +3000,6 @@ static irqreturn_t synaptics_rmi4_irq(int irq, void *data)
 	if (gpio_get_value(bdata->irq_gpio) != bdata->irq_on_state)
 		goto exit;
 
-	/* prevent CPU from entering deep sleep */
-	pm_qos_update_request(&rmi4_data->pm_qos_req, 100);
-
 #ifdef HTC_FEATURE
 	if (rmi4_data->debug_mask & (TOUCH_KPI_LOG | TOUCH_BREAKDOWN_TIME))
 		getnstimeofday(&rmi4_data->tp_handler_time);
@@ -3015,7 +3010,6 @@ static irqreturn_t synaptics_rmi4_irq(int irq, void *data)
 	synaptics_rmi4_sensor_report(rmi4_data, true);
 
 exit:
-	pm_qos_update_request(&rmi4_data->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return IRQ_HANDLED;
 }
 
@@ -6139,9 +6133,6 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 	queue_work(rmi4_data->reset_workqueue, &rmi4_data->reset_work);
 #endif
 
-	pm_qos_add_request(&rmi4_data->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
-		PM_QOS_DEFAULT_VALUE);
-
 	return retval;
 
 err_sysfs:
@@ -6274,7 +6265,6 @@ static int synaptics_rmi4_remove(struct platform_device *pdev)
 	synaptics_rmi4_enable_reg(rmi4_data, false);
 	synaptics_rmi4_get_reg(rmi4_data, false);
 
-	pm_qos_remove_request(&rmi4_data->pm_qos_req);
 	kfree(rmi4_data);
 
 	return 0;
