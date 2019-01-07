@@ -764,7 +764,6 @@ static void htc_show_sensor_temp(void)
 
 extern void htc_print_pon_boot_reason(void);
 
-extern void dump_vm_events_counter(void);
 extern void htc_lmh_stat_show(void);
 extern void htc_lmh_stat_clear(void);
 static void htc_pm_monitor_work_func(struct work_struct *work)
@@ -815,8 +814,6 @@ static void htc_pm_monitor_work_func(struct work_struct *work)
 	queue_delayed_work(htc_pm_monitor_wq, &ktop->dwork, msecs_to_jiffies(msm_htc_util_delay_time));
 	htc_kernel_top_cal(ktop, KERNEL_TOP);
 	htc_kernel_top_show(ktop, KERNEL_TOP);
-
-	dump_vm_events_counter();
 
 	pr_info("[K][PM] hTC PM Statistic done\n");
 }
