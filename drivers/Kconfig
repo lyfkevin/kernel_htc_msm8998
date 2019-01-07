@@ -222,6 +222,4 @@ source "drivers/htc_mnemosyne/Kconfig"
 
 source "drivers/htc_radio/Kconfig"
 
-source "drivers/gud/Kconfig"
-
 endmenu
