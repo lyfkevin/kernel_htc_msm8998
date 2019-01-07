@@ -198,6 +198,3 @@ obj-$(CONFIG_HTC_LOGLEVEL)      += htc_loglevel/
 
 # HTC Modem_BSP
 obj-$(CONFIG_HTC_RADIO_SMEM)	+= htc_radio/
-
-# <t-base drivers
-obj-$(CONFIG_TRUSTONIC_TEE)     += gud/
