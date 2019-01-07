@@ -24,7 +24,6 @@
 #include "adreno_ringbuffer.h"
 #include "adreno_trace.h"
 #include "kgsl_sharedmem.h"
-#include "kgsl_htc.h"
 
 #define DRAWQUEUE_NEXT(_i, _s) (((_i) + 1) % (_s))
 
@@ -74,7 +73,7 @@ static unsigned int _dispatcher_q_inflight_hi = 15;
 static unsigned int _dispatcher_q_inflight_lo = 4;
 
 /* Command batch timeout (in milliseconds) */
-unsigned int adreno_drawobj_timeout = 3500;
+unsigned int adreno_drawobj_timeout = 2000;
 
 /* Interval for reading and comparing fault detection registers */
 static unsigned int _fault_timer_interval = 200;
@@ -2079,10 +2078,8 @@ static int dispatcher_do_fault(struct adreno_device *adreno_dev)
 	int ret, i;
 	int fault;
 	int halt;
-	int keepfault, fault_pid = 0;
 
 	fault = atomic_xchg(&dispatcher->fault, 0);
-	keepfault = fault;
 	if (fault == 0)
 		return 0;
 
@@ -2168,7 +2165,6 @@ static int dispatcher_do_fault(struct adreno_device *adreno_dev)
 
 	if (dispatch_q && !adreno_drawqueue_is_empty(dispatch_q)) {
 		cmdobj = dispatch_q->cmd_q[dispatch_q->head];
-		fault_pid = cmdobj->base.context->proc_priv->pid;
 		trace_adreno_cmdbatch_fault(cmdobj, fault);
 	}
 
@@ -2225,8 +2221,6 @@ static int dispatcher_do_fault(struct adreno_device *adreno_dev)
 	}
 
 	atomic_add(halt, &adreno_dev->halt);
-
-	adreno_fault_panic(device, fault_pid, keepfault);
 
 	return 1;
 }
