@@ -170,15 +170,6 @@ int ion_handle_get_size(struct ion_client *client, struct ion_handle *handle,
 int msm_ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 			void *vaddr, unsigned long len, unsigned int cmd);
 
-/**
- * msm_ion_heap_meminfo - Calculate meminfo in ion heap.
- *
- * @is_total - Calculate total memory usage or in used only
- *
- * Returns memory usage in specified heaps and usages
- */
-uintptr_t msm_ion_heap_meminfo(const bool is_total);
-
 int msm_ion_do_cache_offset_op(
 		struct ion_client *client, struct ion_handle *handle,
 		void *vaddr, unsigned int offset, unsigned long len,
@@ -203,11 +194,6 @@ static inline int msm_ion_do_cache_op(struct ion_client *client,
 	return -ENODEV;
 }
 
-static inline uintptr_t msm_ion_heap_meminfo(const bool is_total)
-{
-	return 0;
-}
-
 int msm_ion_do_cache_offset_op(
 		struct ion_client *client, struct ion_handle *handle,
 		void *vaddr, unsigned int offset, unsigned long len,
@@ -215,6 +201,7 @@ int msm_ion_do_cache_offset_op(
 {
 	return -ENODEV;
 }
+
 #endif /* CONFIG_ION */
 
 #endif
