@@ -5205,7 +5205,11 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = mdss_fb_mode_switch(mfd, dsi_mode);
 		break;
 	case MSMFB_ATOMIC_COMMIT:
-		cpu_general_boost_kick(64);
+		#ifdef CONFIG_CPU_INPUT_BOOST
+			if (time_before(jiffies, last_input_time + msecs_to_jiffies(3000))) {
+				cpu_general_boost_kick(64);
+			}
+		#endif
 		ret = mdss_fb_atomic_commit_ioctl(info, argp, file);
 		break;
 
