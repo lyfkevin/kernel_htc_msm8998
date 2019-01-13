@@ -491,7 +491,8 @@ static unsigned long get_bw_and_set_irq(struct hwmon_node *node,
 	*freq = (new_bw * 100) / io_percent;
 	#ifdef CONFIG_CPU_INPUT_BOOST
 		if (time_before(jiffies, last_input_time + msecs_to_jiffies(3000))) {
-			*freq *= 1 + (freq_scalar / 100);
+			if (freq_scalar)
+				*freq *= 1 + (freq_scalar / 100);
 		}
 	#endif
 	trace_bw_hwmon_update(dev_name(node->hw->df->dev.parent),
