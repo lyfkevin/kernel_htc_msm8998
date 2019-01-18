@@ -241,6 +241,12 @@ config CPU_FREQ_GOV_SCHEDUTIL
 
 	  If in doubt, say N.
 
+config UNDERCLK_MAX_PERFCL
+	int "Underclocked Performance cluster frequency"
+	default "2112000"
+	help
+	  Underclocked frequency for the performance CPU cluster.
+
 config CPU_INPUT_BOOST
 	bool "CPU Input Boost"
 	help
