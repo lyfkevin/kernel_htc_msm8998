@@ -1476,8 +1476,6 @@ static int wma_unified_radio_tx_power_level_stats_event_handler(void *handle,
 	uint8_t *tx_power_level_values;
 	tSirLLStatsResults *link_stats_results;
 	tSirWifiRadioStat *rs_results;
-	uint32_t max_total_num_tx_power_levels = MAX_TPC_LEVELS * NUM_OF_BANDS *
-						MAX_SPATIAL_STREAM_ANY_V3;
 
 	tpAniSirGlobal mac = cds_get_context(QDF_MODULE_ID_PE);
 
