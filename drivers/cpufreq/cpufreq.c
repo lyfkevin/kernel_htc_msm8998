@@ -33,7 +33,6 @@
 #include <linux/sched.h>
 #endif
 #include <trace/events/power.h>
-#include <linux/moduleparam.h>
 
 static LIST_HEAD(cpufreq_policy_list);
 
@@ -2253,8 +2252,7 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_get_policy);
 
-unsigned int UNDERCLK_MAX_PERFCL = CONFIG_UNDERCLK_MAX_PERFCL;
-module_param(UNDERCLK_MAX_PERFCL, uint, 0644);
+#define UNDERCLK_MAX_PERFCL 1958400
 static bool disable_underclock;
 
 /*
