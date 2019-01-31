@@ -27,8 +27,6 @@
 
 #define MAX_EVENTS 30
 
-int vidc_active_instances;
-
 static int get_poll_flags(void *instance)
 {
 	struct msm_vidc_inst *inst = instance;
@@ -1428,7 +1426,6 @@ void *msm_vidc_open(int core_id, int session_type)
 	inst->debugfs_root =
 		msm_vidc_debugfs_init_inst(inst, core->debugfs_root);
 
-	++vidc_active_instances;
 	return inst;
 fail_init:
 	mutex_lock(&core->lock);
@@ -1596,7 +1593,6 @@ int msm_vidc_close(void *instance)
 	}
 
 	kref_put(&inst->kref, close_helper);
-	--vidc_active_instances;
 	return 0;
 }
 EXPORT_SYMBOL(msm_vidc_close);
