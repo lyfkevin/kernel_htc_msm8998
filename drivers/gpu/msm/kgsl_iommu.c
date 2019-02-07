@@ -119,9 +119,11 @@ void kgsl_print_global_pt_entries(struct seq_file *s)
 		if (memdesc == NULL)
 			continue;
 
-		seq_printf(s, "0x%16.16llX-0x%16.16llX %16llu %s\n",
-			memdesc->gpuaddr, memdesc->gpuaddr + memdesc->size - 1,
-			memdesc->size, global_pt_entries[i].name);
+		seq_printf(s, "0x%pK-0x%pK %16llu %s\n",
+			(uint64_t *)(uintptr_t) memdesc->gpuaddr,
+			(uint64_t *)(uintptr_t) (memdesc->gpuaddr +
+			memdesc->size - 1), memdesc->size,
+			global_pt_entries[i].name);
 	}
 }
 
@@ -719,7 +721,7 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	struct kgsl_iommu_context *ctx;
 	u64 ptbase;
 	u32 contextidr;
-	pid_t tid = 0;
+	pid_t pid = 0;
 	pid_t ptname;
 	struct _mem_entry prev, next;
 	int write;
@@ -772,7 +774,7 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	if (context != NULL) {
 		/* save pagefault timestamp for GFT */
 		set_bit(KGSL_CONTEXT_PRIV_PAGEFAULT, &context->priv);
-		tid = context->tid;
+		pid = context->proc_priv->pid;
 	}
 
 	ctx->fault = 1;
@@ -793,7 +795,7 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	contextidr = KGSL_IOMMU_GET_CTX_REG(ctx, CONTEXTIDR);
 
 	ptname = MMU_FEATURE(mmu, KGSL_MMU_GLOBAL_PAGETABLE) ?
-		KGSL_MMU_GLOBAL_PT : tid;
+		KGSL_MMU_GLOBAL_PT : pid;
 	/*
 	 * Trace needs to be logged before searching the faulting
 	 * address in free list as it takes quite long time in
@@ -2511,7 +2513,7 @@ static int _kgsl_iommu_probe(struct kgsl_device *device,
 		return -EINVAL;
 	}
 	iommu->protect.base = reg_val[0] / sizeof(u32);
-	iommu->protect.range = ilog2(reg_val[1] / sizeof(u32));
+	iommu->protect.range = reg_val[1] / sizeof(u32);
 
 	of_property_for_each_string(node, "clock-names", prop, cname) {
 		struct clk *c = devm_clk_get(&pdev->dev, cname);

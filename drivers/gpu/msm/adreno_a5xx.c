@@ -30,7 +30,7 @@
 #include "kgsl_trace.h"
 #include "adreno_a5xx_packets.h"
 
-static int zap_ucode_loaded;
+static void *zap_handle_ptr;
 static int critical_packet_constructed;
 
 static struct kgsl_memdesc crit_pkts;
@@ -85,34 +85,6 @@ static int a5xx_gpmu_init(struct adreno_device *adreno_dev);
 
 #define A530_QFPROM_RAW_PTE_ROW0_MSB 0x134
 #define A530_QFPROM_RAW_PTE_ROW2_MSB 0x144
-
-/* Print some key registers if a spin-for-idle times out */
-static void spin_idle_debug(struct kgsl_device *device,
-		const char *str)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	unsigned int rptr, wptr;
-	unsigned int status, status3, intstatus;
-	unsigned int hwfault;
-
-	dev_err(device->dev, str);
-
-	adreno_readreg(adreno_dev, ADRENO_REG_CP_RB_RPTR, &rptr);
-	adreno_readreg(adreno_dev, ADRENO_REG_CP_RB_WPTR, &wptr);
-
-	kgsl_regread(device, A5XX_RBBM_STATUS, &status);
-	kgsl_regread(device, A5XX_RBBM_STATUS3, &status3);
-	kgsl_regread(device, A5XX_RBBM_INT_0_STATUS, &intstatus);
-	kgsl_regread(device, A5XX_CP_HW_FAULT, &hwfault);
-
-	dev_err(device->dev,
-		"rb=%d pos=%X/%X rbbm_status=%8.8X/%8.8X int_0_status=%8.8X\n",
-		adreno_dev->cur_rb->id, rptr, wptr, status, status3, intstatus);
-
-	dev_err(device->dev, " hwfault=%8.8X\n", hwfault);
-
-	kgsl_device_snapshot(device, NULL);
-}
 
 static void a530_efuse_leakage(struct adreno_device *adreno_dev)
 {
@@ -390,7 +362,7 @@ static void a5xx_protect_init(struct adreno_device *adreno_dev)
 	iommu_regs = kgsl_mmu_get_prot_regs(&device->mmu);
 	if (iommu_regs)
 		adreno_set_protected_registers(adreno_dev, &index,
-				iommu_regs->base, iommu_regs->range);
+				iommu_regs->base, ilog2(iommu_regs->range));
 }
 
 /*
@@ -763,7 +735,7 @@ static int _gpmu_send_init_cmds(struct adreno_device *adreno_dev)
 
 	ret = adreno_ringbuffer_submit_spin(rb, NULL, 2000);
 	if (ret != 0)
-		spin_idle_debug(&adreno_dev->dev,
+		adreno_spin_idle_debug(adreno_dev,
 				"gpmu initialization failed to idle\n");
 
 	return ret;
@@ -2183,7 +2155,7 @@ static int a5xx_post_start(struct adreno_device *adreno_dev)
 
 	ret = adreno_ringbuffer_submit_spin(rb, NULL, 2000);
 	if (ret)
-		spin_idle_debug(KGSL_DEVICE(adreno_dev),
+		adreno_spin_idle_debug(adreno_dev,
 				"hw initialization failed to idle\n");
 
 	return ret;
@@ -2208,37 +2180,15 @@ static int a5xx_gpmu_init(struct adreno_device *adreno_dev)
 	return 0;
 }
 
-static int a5xx_switch_to_unsecure_mode(struct adreno_device *adreno_dev,
-				struct adreno_ringbuffer *rb)
-{
-	unsigned int *cmds;
-	int ret;
-
-	cmds = adreno_ringbuffer_allocspace(rb, 2);
-	if (IS_ERR(cmds))
-		return PTR_ERR(cmds);
-	if (cmds == NULL)
-		return -ENOSPC;
-
-	cmds += cp_secure_mode(adreno_dev, cmds, 0);
-
-	ret = adreno_ringbuffer_submit_spin(rb, NULL, 2000);
-	if (ret)
-		spin_idle_debug(KGSL_DEVICE(adreno_dev),
-				"Switch to unsecure failed to idle\n");
-
-	return ret;
-}
-
 /*
  * a5xx_microcode_load() - Load microcode
  * @adreno_dev: Pointer to adreno device
  */
 static int a5xx_microcode_load(struct adreno_device *adreno_dev)
 {
-	void *ptr;
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	uint64_t gpuaddr;
+	int ret = 0, zap_retry = 0;
 
 	gpuaddr = adreno_dev->pm4.gpuaddr;
 	kgsl_regwrite(device, A5XX_CP_PM4_INSTR_BASE_LO,
@@ -2253,20 +2203,26 @@ static int a5xx_microcode_load(struct adreno_device *adreno_dev)
 				upper_32_bits(gpuaddr));
 
 	/*
+	 * Do not invoke to load zap shader if MMU does
+	 * not support secure mode.
+	 */
+	if (!device->mmu.secured)
+		return 0;
+
+	/*
 	 * Resume call to write the zap shader base address into the
 	 * appropriate register,
 	 * skip if retention is supported for the CPZ register
 	 */
-	if (zap_ucode_loaded && !(ADRENO_FEATURE(adreno_dev,
+	if (adreno_dev->zap_loaded && !(ADRENO_FEATURE(adreno_dev,
 		ADRENO_CPZ_RETENTION))) {
-		int ret;
 		struct scm_desc desc = {0};
 
 		desc.args[0] = 0;
 		desc.args[1] = 13;
 		desc.arginfo = SCM_ARGS(2);
 
-		ret = scm_call2(SCM_SIP_FNID(SCM_SVC_BOOT, 0xA), &desc);
+		ret = scm_call2_atomic(SCM_SIP_FNID(SCM_SVC_BOOT, 0xA), &desc);
 		if (ret) {
 			pr_err("SCM resume call failed with error %d\n", ret);
 			return ret;
@@ -2275,17 +2231,35 @@ static int a5xx_microcode_load(struct adreno_device *adreno_dev)
 	}
 
 	/* Load the zap shader firmware through PIL if its available */
-	if (adreno_dev->gpucore->zap_name && !zap_ucode_loaded) {
-		ptr = subsystem_get(adreno_dev->gpucore->zap_name);
+	if (adreno_dev->gpucore->zap_name && !adreno_dev->zap_loaded) {
+		/*
+		 * subsystem_get() may return -EAGAIN in case system is busy
+		 * and unable to load the firmware. So keep trying since this
+		 * is not a fatal error.
+		 */
+		do {
+			ret = 0;
+			zap_handle_ptr = subsystem_get(adreno_dev->gpucore->zap_name);
 
-		/* Return error if the zap shader cannot be loaded */
-		if (IS_ERR_OR_NULL(ptr))
-			return (ptr == NULL) ? -ENODEV : PTR_ERR(ptr);
-
-		zap_ucode_loaded = 1;
+			/* Return error if the zap shader cannot be loaded */
+			if (IS_ERR_OR_NULL(zap_handle_ptr )) {
+				ret = (zap_handle_ptr  == NULL) ? -ENODEV : PTR_ERR(zap_handle_ptr );
+				zap_handle_ptr  = NULL;
+			} else
+				adreno_dev->zap_loaded = 1;
+		} while ((ret == -EAGAIN) && (zap_retry++ < ZAP_RETRY_MAX));
 	}
 
-	return 0;
+	return ret;
+}
+
+static void a5xx_zap_shader_unload(struct adreno_device *adreno_dev)
+{
+	if (!IS_ERR_OR_NULL(zap_handle_ptr)) {
+		subsystem_put(zap_handle_ptr);
+		zap_handle_ptr = NULL;
+		adreno_dev->zap_loaded = 0;
+	}
 }
 
 static int _me_init_ucode_workarounds(struct adreno_device *adreno_dev)
@@ -2388,7 +2362,7 @@ static void _set_ordinals(struct adreno_device *adreno_dev,
 		*cmds++ = 0x0;
 }
 
-static int a5xx_critical_packet_submit(struct adreno_device *adreno_dev,
+int a5xx_critical_packet_submit(struct adreno_device *adreno_dev,
 					struct adreno_ringbuffer *rb)
 {
 	unsigned int *cmds;
@@ -2407,7 +2381,7 @@ static int a5xx_critical_packet_submit(struct adreno_device *adreno_dev,
 
 	ret = adreno_ringbuffer_submit_spin(rb, NULL, 20);
 	if (ret)
-		spin_idle_debug(KGSL_DEVICE(adreno_dev),
+		adreno_spin_idle_debug(adreno_dev,
 			"Critical packet submission failed to idle\n");
 
 	return ret;
@@ -2438,29 +2412,8 @@ static int a5xx_send_me_init(struct adreno_device *adreno_dev,
 
 	ret = adreno_ringbuffer_submit_spin(rb, NULL, 2000);
 	if (ret)
-		spin_idle_debug(KGSL_DEVICE(adreno_dev),
+		adreno_spin_idle_debug(adreno_dev,
 				"CP initialization failed to idle\n");
-
-	return ret;
-}
-
-static int a5xx_set_unsecured_mode(struct adreno_device *adreno_dev,
-		struct adreno_ringbuffer *rb)
-{
-	int ret = 0;
-
-	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_CRITICAL_PACKETS)) {
-		ret = a5xx_critical_packet_submit(adreno_dev, rb);
-		if (ret)
-			return ret;
-	}
-
-	/* GPU comes up in secured mode, make it unsecured by default */
-	if (ADRENO_FEATURE(adreno_dev, ADRENO_CONTENT_PROTECTION))
-		ret = a5xx_switch_to_unsecure_mode(adreno_dev, rb);
-	else
-		kgsl_regwrite(&adreno_dev->dev,
-				A5XX_RBBM_SECVID_TRUST_CNTL, 0x0);
 
 	return ret;
 }
@@ -2508,7 +2461,7 @@ static int a5xx_rb_start(struct adreno_device *adreno_dev,
 		return ret;
 
 	/* GPU comes up in secured mode, make it unsecured by default */
-	ret = a5xx_set_unsecured_mode(adreno_dev, rb);
+	ret = adreno_set_unsecured_mode(adreno_dev, rb);
 	if (ret)
 		return ret;
 
@@ -3058,6 +3011,7 @@ static unsigned int a5xx_register_offsets[ADRENO_REG_REGISTER_MAX] = {
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_MEQ_ADDR, A5XX_CP_MEQ_DBG_ADDR),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_MEQ_DATA, A5XX_CP_MEQ_DBG_DATA),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_PROTECT_REG_0, A5XX_CP_PROTECT_REG_0),
+	ADRENO_REG_DEFINE(ADRENO_REG_CP_HW_FAULT, A5XX_CP_HW_FAULT),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_PREEMPT, A5XX_CP_CONTEXT_SWITCH_CNTL),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_PREEMPT_DEBUG, ADRENO_REG_SKIP),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_PREEMPT_DISABLE, ADRENO_REG_SKIP),
@@ -3698,4 +3652,5 @@ struct adreno_gpudev adreno_a5xx_gpudev = {
 	.preemption_schedule = a5xx_preemption_schedule,
 	.enable_64bit = a5xx_enable_64bit,
 	.clk_set_options = a5xx_clk_set_options,
+	.zap_shader_unload = a5xx_zap_shader_unload,
 };

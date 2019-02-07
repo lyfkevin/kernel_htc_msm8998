@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -208,8 +208,8 @@ static inline bool _isidle(struct adreno_device *adreno_dev)
 	if (!kgsl_state_is_awake(KGSL_DEVICE(adreno_dev)))
 		goto ret;
 
-	if (adreno_rb_empty(adreno_dev->cur_rb))
-		goto ret;
+	if (!adreno_rb_empty(adreno_dev->cur_rb))
+		return false;
 
 	/* only check rbbm status to determine if GPU is idle */
 	adreno_readreg(adreno_dev, ADRENO_REG_RBBM_STATUS, &reg_rbbm_status);
@@ -561,6 +561,8 @@ static int sendcmd(struct adreno_device *adreno_dev,
 		return -EBUSY;
 	}
 
+	memset(&time, 0x0, sizeof(time));
+
 	dispatcher->inflight++;
 	dispatch_q->inflight++;
 
@@ -677,7 +679,7 @@ static int sendcmd(struct adreno_device *adreno_dev,
 	 * then set up the timer.  If this misses, then preemption is indeed a
 	 * thing and the timer will be set up in due time
 	 */
-	if (!adreno_in_preempt_state(adreno_dev, ADRENO_PREEMPT_NONE)) {
+	if (adreno_in_preempt_state(adreno_dev, ADRENO_PREEMPT_NONE)) {
 		if (drawqueue_is_current(dispatch_q))
 			mod_timer(&dispatcher->timer, dispatch_q->expires);
 	}
@@ -1824,7 +1826,8 @@ static void process_cmdobj_fault(struct kgsl_device *device,
 	 * because we won't see this cmdobj again
 	 */
 
-	if (fault & ADRENO_TIMEOUT_FAULT)
+	if ((fault & ADRENO_TIMEOUT_FAULT) ||
+				(fault & ADRENO_CTX_DETATCH_TIMEOUT_FAULT))
 		bitmap_zero(&cmdobj->fault_policy, BITS_PER_LONG);
 
 	/*
@@ -2807,6 +2810,16 @@ int adreno_dispatcher_init(struct adreno_device *adreno_dev)
 	return ret;
 }
 
+void adreno_dispatcher_halt(struct kgsl_device *device)
+{
+	adreno_get_gpu_halt(ADRENO_DEVICE(device));
+}
+
+void adreno_dispatcher_unhalt(struct kgsl_device *device)
+{
+	adreno_put_gpu_halt(ADRENO_DEVICE(device));
+}
+
 /*
  * adreno_dispatcher_idle() - Wait for dispatcher to idle
  * @adreno_dev: Adreno device whose dispatcher needs to idle
@@ -2829,11 +2842,9 @@ int adreno_dispatcher_idle(struct adreno_device *adreno_dev)
 	 * Ensure that this function is not called when dispatcher
 	 * mutex is held and device is started
 	 */
-#if defined(CONFIG_DEBUG_MUTEXES) || defined(CONFIG_MUTEX_SPIN_ON_OWNER)
 	if (mutex_is_locked(&dispatcher->mutex) &&
 		dispatcher->mutex.owner == current)
 		BUG_ON(1);
-#endif
 
 	adreno_get_gpu_halt(adreno_dev);
 
