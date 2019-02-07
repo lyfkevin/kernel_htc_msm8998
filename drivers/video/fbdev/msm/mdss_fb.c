@@ -5206,7 +5206,7 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		break;
 	case MSMFB_ATOMIC_COMMIT:
 		#ifdef CONFIG_CPU_INPUT_BOOST
-			if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY) && should_kick_frame_boost()) {
+			if (should_kick_frame_boost()) {
 				cpu_input_boost_kick_general(64);
 			}
 		#endif
