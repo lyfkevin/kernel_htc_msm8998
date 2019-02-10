@@ -33,6 +33,7 @@
 #include <linux/sched.h>
 #endif
 #include <trace/events/power.h>
+#include <linux/moduleparam.h>
 #include <linux/state_notifier.h>
 
 #define SCREEN_OFF_CEILING    1248000
@@ -2258,7 +2259,8 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_get_policy);
 
-#define UNDERCLK_MAX_PERFCL 1958400
+unsigned int UNDERCLK_MAX_PERFCL = CONFIG_UNDERCLK_MAX_PERFCL;
+module_param(UNDERCLK_MAX_PERFCL, uint, 0644);
 static bool disable_underclock;
 
 /*

@@ -281,6 +281,12 @@ config CPU_FREQ_GOV_HELIX
  	  both cases. This governor also allows changing of the frequency tipping point by changing the bit shift value of the schedutil get_next_freq equation.
   	  If in doubt, say N.
 
+config UNDERCLK_MAX_PERFCL
+	int "Underclocked Performance cluster frequency"
+	default "2112000"
+	help
+	  Underclocked frequency for the performance CPU cluster.
+
 config CPU_INPUT_BOOST
 	bool "CPU Input Boost"
 	help
