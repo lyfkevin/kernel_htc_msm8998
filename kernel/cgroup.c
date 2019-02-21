@@ -62,6 +62,7 @@
 #include <linux/binfmts.h>
 #include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
+#include <linux/state_notifier.h>
 
 /*
  * pidlists linger the following amount before being destroyed.  The goal
@@ -2778,7 +2779,7 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
 
 	/* This covers boosting for app launches and app transitions */
-	if (!ret && !threadgroup &&
+	if (!ret && !threadgroup && !state_suspended &&
 		!memcmp(of->kn->parent->name, "top-app", sizeof("top-app")) &&
 		is_zygote_pid(tsk->parent->pid)) {
 		cpu_input_boost_kick_max(500);
