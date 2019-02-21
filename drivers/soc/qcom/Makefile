@@ -109,4 +109,3 @@ obj-$(CONFIG_QCOM_EARLY_RANDOM)	+= early_random.o
 obj-$(CONFIG_QCOM_CX_IPEAK) += cx_ipeak.o
 obj-$(CONFIG_MSM_CACHE_M4M_ERP64) += cache_m4m_erp64.o
 obj-$(CONFIG_HTC_WLAN_NV) += custom_platdev.o
-obj-$(CONFIG_STATE_NOTIFIER)   += state_notifier.o
