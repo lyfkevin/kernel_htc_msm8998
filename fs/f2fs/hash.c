@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * fs/f2fs/hash.c
  *
@@ -8,6 +7,10 @@
  * Portions of this code from linux/fs/ext3/hash.c
  *
  * Copyright (C) 2002 by Theodore Ts'o
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #include <linux/types.h>
 #include <linux/fs.h>
@@ -68,7 +71,7 @@ static void str2hashbuf(const unsigned char *msg, size_t len,
 }
 
 f2fs_hash_t f2fs_dentry_hash(const struct qstr *name_info,
-				struct fscrypt_name *fname)
+				struct f2fs_filename *fname)
 {
 	__u32 hash;
 	f2fs_hash_t f2fs_hash;
