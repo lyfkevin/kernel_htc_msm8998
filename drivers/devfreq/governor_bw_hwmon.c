@@ -30,7 +30,6 @@
 #include <linux/of.h>
 #include <linux/devfreq.h>
 #include <trace/events/power.h>
-#include <linux/cpu_input_boost.h>
 #include "governor.h"
 #include "governor_bw_hwmon.h"
 
@@ -53,7 +52,6 @@ struct hwmon_node {
 	unsigned int low_power_io_percent;
 	unsigned int low_power_delay;
 	unsigned int mbps_zones[NUM_MBPS_ZONES];
-	unsigned int freq_scalar;
 
 	unsigned long prev_ab;
 	unsigned long *dev_ab;
@@ -319,7 +317,7 @@ static unsigned long get_bw_and_set_irq(struct hwmon_node *node,
 	unsigned long meas_mbps_zone;
 	unsigned long hist_lo_tol, hyst_lo_tol;
 	struct bw_hwmon *hw = node->hw;
-	unsigned int new_bw, io_percent, freq_scalar;
+	unsigned int new_bw, io_percent;
 	ktime_t ts;
 	unsigned int ms = 0;
 
@@ -365,8 +363,6 @@ static unsigned long get_bw_and_set_irq(struct hwmon_node *node,
 		io_percent = node->io_percent;
 	else
 		io_percent = node->low_power_io_percent;
-
-	freq_scalar = node->freq_scalar;
 
 	/*
 	 * The AB value that corresponds to the lowest mbps zone greater than
@@ -489,11 +485,6 @@ static unsigned long get_bw_and_set_irq(struct hwmon_node *node,
 		*ab = roundup(new_bw, node->bw_step);
 
 	*freq = (new_bw * 100) / io_percent;
-	#ifdef CONFIG_CPU_INPUT_BOOST
-		if (time_before(jiffies, last_input_jiffies + msecs_to_jiffies(3000))) {
-			*freq *= 1 + (freq_scalar / 100);
-		}
-	#endif
 	trace_bw_hwmon_update(dev_name(node->hw->df->dev.parent),
 				new_bw,
 				*freq,
@@ -799,7 +790,6 @@ gov_attr(low_power_ceil_mbps, 0U, 2500U);
 gov_attr(low_power_io_percent, 1U, 100U);
 gov_attr(low_power_delay, 1U, 60U);
 gov_list_attr(mbps_zones, NUM_MBPS_ZONES, 0U, UINT_MAX);
-gov_attr(freq_scalar, 0U, 500U);
 
 static struct attribute *dev_attr[] = {
 	&dev_attr_guard_band_mbps.attr,
@@ -820,7 +810,6 @@ static struct attribute *dev_attr[] = {
 	&dev_attr_low_power_delay.attr,
 	&dev_attr_mbps_zones.attr,
 	&dev_attr_throttle_adj.attr,
-	&dev_attr_freq_scalar.attr,
 	NULL,
 };
 
@@ -965,7 +954,6 @@ int register_bw_hwmon(struct device *dev, struct bw_hwmon *hwmon)
 	node->hyst_length = 0;
 	node->idle_mbps = 400;
 	node->mbps_zones[0] = 0;
-	node->freq_scalar = CONFIG_BW_HWMON_DEFAULT_FREQ_SCALAR;
 	node->hw = hwmon;
 
 	mutex_lock(&list_lock);
