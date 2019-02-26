@@ -66,17 +66,20 @@ static void clear_boost_bit(struct boost_drv *b, u32 state)
 	atomic_andnot(state, &b->state);
 }
 
-static void set_stune_boost(struct boost_drv *b, u32 state, u32 bit, int level,
-			    int *slot)
+static void set_stune_boost(struct boost_drv *b, u32 bit, int level, int *slot)
 {
+	u32 state = get_boost_state(b);
+
 	if (level && !(state & bit)) {
 		if (!do_stune_boost("top-app", level, slot))
 			set_boost_bit(b, bit);
 	}
 }
 
-static void clear_stune_boost(struct boost_drv *b, u32 state, u32 bit, int slot)
+static void clear_stune_boost(struct boost_drv *b, u32 bit, int slot)
 {
+	u32 state = get_boost_state(b);
+
 	if (state & bit) {
 		reset_stune_boost("top-app", slot);
 		clear_boost_bit(b, bit);
@@ -85,14 +88,12 @@ static void clear_stune_boost(struct boost_drv *b, u32 state, u32 bit, int slot)
 
 static void unboost_all_cpus(struct boost_drv *b)
 {
-	u32 state = get_boost_state(b);
-
 	if (!cancel_delayed_work_sync(&b->input_unboost) &&
 		!cancel_delayed_work_sync(&b->general_unboost))
 		return;
 
-	clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
-	clear_stune_boost(b, state, GENERAL_STUNE_BOOST, b->general_stune_slot);
+	clear_stune_boost(b, INPUT_STUNE_BOOST, b->input_stune_slot);
+	clear_stune_boost(b, GENERAL_STUNE_BOOST, b->general_stune_slot);
 }
 
 void cpu_input_boost_kick(void)
@@ -145,10 +146,9 @@ void cpu_general_boost_kick(unsigned int duration_ms)
 static void input_boost_worker(struct work_struct *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), input_boost);
-	u32 state = get_boost_state(b);
 
 	if (!cancel_delayed_work_sync(&b->input_unboost)) {
-		set_stune_boost(b, state, INPUT_STUNE_BOOST, input_stune_boost,
+		set_stune_boost(b, INPUT_STUNE_BOOST, input_stune_boost,
 			&b->input_stune_slot);
 	}
 
@@ -159,10 +159,9 @@ static void input_boost_worker(struct work_struct *work)
 static void general_boost_worker(struct work_struct *work)
 {
 	struct boost_drv *b = container_of(work, typeof(*b), general_boost);
-	u32 state = get_boost_state(b);
 
 	if (!cancel_delayed_work_sync(&b->general_unboost)) {
-		set_stune_boost(b, state, GENERAL_STUNE_BOOST, general_stune_boost,
+		set_stune_boost(b, GENERAL_STUNE_BOOST, general_stune_boost,
 			&b->general_stune_slot);
 	}
 
@@ -174,18 +173,16 @@ static void input_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b =
 		container_of(to_delayed_work(work), typeof(*b), input_unboost);
-	u32 state = get_boost_state(b);
 
-	clear_stune_boost(b, state, INPUT_STUNE_BOOST, b->input_stune_slot);
+	clear_stune_boost(b, INPUT_STUNE_BOOST, b->input_stune_slot);
 }
 
 static void general_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b =
 		container_of(to_delayed_work(work), typeof(*b), general_unboost);
-	u32 state = get_boost_state(b);
 
-	clear_stune_boost(b, state, GENERAL_STUNE_BOOST, b->general_stune_slot);
+	clear_stune_boost(b, GENERAL_STUNE_BOOST, b->general_stune_slot);
 }
 
 static int fb_notifier_cb(struct notifier_block *nb,
@@ -212,9 +209,6 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 					int value)
 {
 	struct boost_drv *b = handle->handler->private;
-	u32 state;
-
-	state = get_boost_state(b);
 
 	atomic64_set(&b->prev_input_jiffies, jiffies);
 	queue_work(b->wq, &b->input_boost);
