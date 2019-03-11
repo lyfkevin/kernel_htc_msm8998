@@ -189,7 +189,7 @@ inline void suspend_cpu_down(void) {
 	unsigned int cpu;
 
 	for_each_present_cpu(cpu)
-		if ((cpu != 0) && (cpu != 4) && cpu_online(cpu))
+		if ((cpu != 0) && (cpu != NR_CPUS / 2) && cpu_online(cpu))
 			cpu_down(cpu);
 }
 
@@ -197,7 +197,7 @@ inline void suspend_cpu_up(void) {
 	unsigned int cpu;
 
 	for_each_present_cpu(cpu)
-		if ((cpu != 0) && (cpu != 4) && !cpu_online(cpu))
+		if ((cpu != 0) && (cpu != NR_CPUS / 2) && !cpu_online(cpu))
 			cpu_up(cpu);
 }
 
