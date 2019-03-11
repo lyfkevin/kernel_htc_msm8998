@@ -185,6 +185,22 @@ static void general_unboost_worker(struct work_struct *work)
 	clear_stune_boost(b, GENERAL_STUNE_BOOST, b->general_stune_slot);
 }
 
+inline void suspend_cpu_down(void) {
+	unsigned int cpu;
+
+	for_each_present_cpu(cpu)
+		if ((cpu != 0) && (cpu != 4) && cpu_online(cpu))
+			cpu_down(cpu);
+}
+
+inline void suspend_cpu_up(void) {
+	unsigned int cpu;
+
+	for_each_present_cpu(cpu)
+		if ((cpu != 0) && (cpu != 4) && !cpu_online(cpu))
+			cpu_up(cpu);
+}
+
 static int fb_notifier_cb(struct notifier_block *nb,
 			  unsigned long action, void *data)
 {
@@ -197,8 +213,11 @@ static int fb_notifier_cb(struct notifier_block *nb,
 		return NOTIFY_OK;
 
 	/* Unboost when the screen turns off */
-	if (*blank != FB_BLANK_UNBLANK) {
+	if (*blank == FB_BLANK_UNBLANK) {
+		suspend_cpu_up();
+	} else {
 		unboost_all_cpus(b);
+		suspend_cpu_down();
 	}
 
 	return NOTIFY_OK;
