@@ -284,6 +284,14 @@ config GENERAL_BOOST_STUNE_LEVEL
 	  accepted for testing purposes. A value of 0 disables SchedTune
 	  boosting for this level.
 
+config INPUT_BOOST_SUSPEND_HOTPLUG
+	bool "Hotplug CPUs on suspend"
+	default y
+	help
+	  Some chipsets can benefit from unplugging some of the CPUs. This
+	  reduces the idle power usage a bit. It can also cause slower wake
+	  times if it is used on a low-performance chipset.
+
 endif
 
 comment "CPU frequency scaling drivers"
