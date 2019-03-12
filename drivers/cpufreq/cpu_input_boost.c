@@ -45,7 +45,8 @@ struct boost_drv {
 
 static struct boost_drv *boost_drv_g __read_mostly;
 
-bool cpu_input_boost_within_timeout(unsigned int input_boost_timeout) {
+bool cpu_input_boost_within_timeout(unsigned int input_boost_timeout)
+{
 	struct boost_drv *b = boost_drv_g;
 
 	if (!b)
@@ -189,7 +190,8 @@ static void general_unboost_worker(struct work_struct *work)
 	clear_stune_boost(b, GENERAL_STUNE_BOOST, b->general_stune_slot);
 }
 
-static void suspend_cpu_down_worker(struct work_struct *work) {
+static void suspend_cpu_down_worker(struct work_struct *work)
+{
 	unsigned int cpu;
 
 	for_each_present_cpu(cpu)
@@ -197,7 +199,8 @@ static void suspend_cpu_down_worker(struct work_struct *work) {
 			cpu_down(cpu);
 }
 
-static void suspend_cpu_up_worker(struct work_struct *work) {
+static void suspend_cpu_up_worker(struct work_struct *work)
+{
 	unsigned int cpu;
 
 	for_each_present_cpu(cpu)
@@ -205,7 +208,8 @@ static void suspend_cpu_up_worker(struct work_struct *work) {
 			cpu_up(cpu);
 }
 
-static void suspend_cpu_kick(struct boost_drv *b, bool up) {
+static void suspend_cpu_kick(struct boost_drv *b, bool up)
+{
 	if (!suspend_hotplug)
 		return;
 
