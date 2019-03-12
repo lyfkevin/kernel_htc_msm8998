@@ -15,10 +15,12 @@
 static __read_mostly unsigned short input_boost_duration = CONFIG_INPUT_BOOST_DURATION_MS;
 static __read_mostly int input_stune_boost = CONFIG_INPUT_BOOST_STUNE_LEVEL;
 static __read_mostly int general_stune_boost = CONFIG_GENERAL_BOOST_STUNE_LEVEL;
+static __read_mostly bool suspend_hotplug = IS_ENABLED(CONFIG_INPUT_BOOST_SUSPEND_HOTPLUG);
 
 module_param(input_boost_duration, short, 0644);
 module_param_named(dynamic_stune_boost, input_stune_boost, int, 0644);
 module_param(general_stune_boost, int, 0644);
+module_param(suspend_hotplug, bool, 0644);
 
 /* Available bits for boost_drv state */
 #define INPUT_STUNE_BOOST	BIT(0)
@@ -203,6 +205,16 @@ static void suspend_cpu_up_worker(struct work_struct *work) {
 			cpu_up(cpu);
 }
 
+static void suspend_cpu_kick(struct boost_drv *b, bool up) {
+	if (!suspend_hotplug)
+		return;
+
+	if (up)
+		queue_work(b->wq, &b->suspend_cpu_up);
+	else
+		queue_work(b->wq, &b->suspend_cpu_down);
+}
+
 static int fb_notifier_cb(struct notifier_block *nb,
 			  unsigned long action, void *data)
 {
@@ -216,10 +228,10 @@ static int fb_notifier_cb(struct notifier_block *nb,
 
 	/* Unboost when the screen turns off */
 	if (*blank == FB_BLANK_UNBLANK) {
-		queue_work(b->wq, &b->suspend_cpu_up);
+		suspend_cpu_kick(b, true);
 	} else {
 		unboost_all_cpus(b);
-		queue_work(b->wq, &b->suspend_cpu_down);
+		suspend_cpu_kick(b, false);
 	}
 
 	return NOTIFY_OK;
