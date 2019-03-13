@@ -270,7 +270,6 @@
 		qcom,mdss-dsi-te-check-enable;
 		qcom,mdss-dsi-te-using-te-pin;
 		qcom,mdss-tear-check-sync-cfg-height = <0x3ff0>;
-		qcom,esd-check-enabled;
 		qcom,mdss-dsi-panel-status-check-mode = "te_signal_check_v2";
 		/* XXX: Don't care */
 		qcom,mdss-dsi-panel-status-command = [06 01 00 01 05 00 02 0A 00];

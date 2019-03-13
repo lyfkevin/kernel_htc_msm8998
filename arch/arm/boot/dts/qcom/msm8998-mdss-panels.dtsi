@@ -87,7 +87,6 @@
 	qcom,mdss-dsi-t-clk-post = <0x07>;
 	qcom,mdss-dsi-t-clk-pre = <0x25>;
 	qcom,mdss-dsi-tx-eot-append;
-	qcom,esd-check-enabled;
 	qcom,mdss-dsi-min-refresh-rate = <55>;
 	qcom,mdss-dsi-max-refresh-rate = <60>;
 	qcom,mdss-dsi-pan-enable-dynamic-fps;
@@ -106,7 +105,6 @@
 	qcom,mdss-dsi-t-clk-post = <0x0d>;
 	qcom,mdss-dsi-t-clk-pre = <0x2d>;
 	qcom,mdss-dsi-tx-eot-append;
-	qcom,esd-check-enabled;
 	qcom,mdss-dsi-panel-status-check-mode = "reg_read";
 	qcom,mdss-dsi-panel-status-command = [06 01 00 01 00 00 01 0a];
 	qcom,mdss-dsi-panel-status-command-state = "dsi_hs_mode";
@@ -133,7 +131,6 @@
 	qcom,mdss-dsi-t-clk-post = <0x05>;
 	qcom,mdss-dsi-t-clk-pre = <0x1b>;
 	qcom,mdss-dsi-tx-eot-append;
-	qcom,esd-check-enabled;
 	qcom,mdss-dsi-panel-status-check-mode = "reg_read";
 	qcom,mdss-dsi-panel-status-command = [06 01 00 01 00 00 01 0a];
 	qcom,mdss-dsi-panel-status-command-state = "dsi_hs_mode";
@@ -152,7 +149,6 @@
 	qcom,mdss-dsi-t-clk-post = <0x05>;
 	qcom,mdss-dsi-t-clk-pre = <0x1b>;
 	qcom,mdss-dsi-tx-eot-append;
-	qcom,esd-check-enabled;
 	qcom,mdss-dsi-panel-status-check-mode = "reg_read";
 	qcom,mdss-dsi-panel-status-command = [06 01 00 01 00 00 01 0a];
 	qcom,mdss-dsi-panel-status-command-state = "dsi_hs_mode";
@@ -188,7 +184,6 @@
 	qcom,mdss-dsi-panel-timings = [00 17 05 05 09 0f 05 06 04 03 04 00];
 	qcom,mdss-dsi-t-clk-post = <0x06>;
 	qcom,mdss-dsi-t-clk-pre = <0x23>;
-	qcom,esd-check-enabled;
 	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
 };
 
