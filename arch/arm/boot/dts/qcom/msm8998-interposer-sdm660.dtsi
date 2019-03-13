@@ -2835,14 +2835,6 @@
 		};
 	};
 
-	htc_pnpmgr{
-		compatible = "htc,perf_table";
-		htc,cluster-map = <0x0F>, <0xF0>;
-		htc,perf_table = <960000>, <960000>, <960000>, <960000>, <960000>,
-			<960000>, <960000>, <960000>, <960000>, <960000>;
-	};
-
-
 	qcom,msm-ssc-sensors {
 		compatible = "qcom,msm-ssc-sensors";
 		status = "ok";
